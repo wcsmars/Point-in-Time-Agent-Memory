@@ -49,7 +49,7 @@ def test_equal_number_for_wrong_fiscal_year_is_inaccurate():
                           expected_period_end=newer.period_end)
     # Deliberately broken injected retriever: value is right, period is wrong.
     report = evaluate([old, newer], [case], bootstrap_samples=0,
-                      bitemporal_retriever=lambda q: Retrieval(q.query_id, "pit", old, (old,)))
+                      bitemporal_retriever=lambda q: Retrieval(q.query_id, "bitemporal", old, (old,)))
     trace = next(row for row in report["traces"] if row["backend"] == "bitemporal")
     assert trace["correct"] is False
     assert trace["answer_leaked"] is False

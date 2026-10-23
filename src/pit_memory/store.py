@@ -11,7 +11,7 @@ _COLUMNS = tuple(f.name for f in fields(Fact))
 _SELECT = ", ".join(_COLUMNS)
 
 
-def select_latest(query: Query, facts: Iterable[Fact], backend: str = "pit") -> Retrieval:
+def select_latest(query: Query, facts: Iterable[Fact], backend: str = "bitemporal") -> Retrieval:
     """Dependency-free reference implementation of point-in-time selection."""
     eligible = [fact for fact in facts if fact.cik == query.cik and fact.concept == query.concept
                 and fact.unit == query.unit and fact.available_on <= query.as_of
@@ -26,13 +26,44 @@ def select_latest(query: Query, facts: Iterable[Fact], backend: str = "pit") -> 
     return Retrieval(query.query_id, backend, context[0], context, "known")
 
 
+_DUCKDB_SIGNATURE = b"DUCK"  # bytes 8-11 of every DuckDB database file
+
+
 class DuckDBStore:
-    def __init__(self, path: str | Path = ":memory:") -> None:
+    """Append-only fact versions in a DuckDB file.
+
+    ``read_only=True`` opens an existing database without taking the write
+    lock, so several readers (for example parallel ``query`` calls) can share it.
+    """
+
+    def __init__(self, path: str | Path = ":memory:", read_only: bool = False) -> None:
         import duckdb
 
-        if str(path) != ":memory:":
-            Path(path).parent.mkdir(parents=True, exist_ok=True)
-        self.connection = duckdb.connect(str(path))
+        target = str(path)
+        if target != ":memory:":
+            file = Path(path)
+            if file.is_dir():
+                raise ValueError(f"{file} is a directory, not a DuckDB database file")
+            if file.is_file() and file.stat().st_size > 0:
+                with file.open("rb") as handle:
+                    if handle.read(12)[8:12] != _DUCKDB_SIGNATURE:
+                        # DuckDB would silently open some formats (JSON, CSV) as an
+                        # empty in-memory database and lose every write.
+                        raise ValueError(f"{file} is not a DuckDB database file")
+            elif read_only:
+                raise ValueError(f"Database does not exist: {file}")
+            else:
+                file.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.connection = duckdb.connect(target, read_only=read_only)
+            if read_only:
+                self.connection.execute("SELECT count(*) FROM facts").fetchone()
+            else:
+                self._create_schema()
+        except duckdb.Error as exc:
+            raise RuntimeError(f"Could not open DuckDB database {target}: {exc}") from exc
+
+    def _create_schema(self) -> None:
         self.connection.execute("""
           CREATE TABLE IF NOT EXISTS facts (
             cik VARCHAR NOT NULL, concept VARCHAR NOT NULL, unit VARCHAR NOT NULL,
@@ -97,7 +128,7 @@ class DuckDBStore:
         ).fetchall()
         return [{"source_sha256": sha, "source_url": url} for sha, url in rows]
 
-    def retrieve(self, query: Query, backend: str = "pit") -> Retrieval:
+    def retrieve(self, query: Query, backend: str = "bitemporal") -> Retrieval:
         if backend not in {"pit", "bitemporal"}:
             raise ValueError("DuckDBStore implements only the point-in-time backend")
         filters = "cik=? AND concept=? AND unit=? AND available_on<=? AND period_end<=?"

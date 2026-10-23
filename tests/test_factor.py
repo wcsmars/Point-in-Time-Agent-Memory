@@ -124,3 +124,12 @@ def test_future_only_period_metadata_cannot_change_historical_growth():
     assert before["signal"] == pytest.approx(.2)
     assert after["signal"] == pytest.approx(.2)
     assert after["previous_fact_id"] == before["previous_fact_id"]
+
+
+def test_identical_backends_get_identical_intervals():
+    result = evaluate_factor(sample_facts(), sample_returns() + [
+        ForwardReturn(str(cik), "2021-05-03", cik / 50) for cik in (1, 2, 3)], bootstrap_samples=50)
+    overwrite, period_end = result["summary"]["overwrite"], result["summary"]["period_end"]
+    assert overwrite["mean_ic"] == period_end["mean_ic"]
+    assert overwrite["mean_ic_ci95"] == period_end["mean_ic_ci95"]
+    assert overwrite["paired_delta_ci95"] == period_end["paired_delta_ci95"]

@@ -65,6 +65,7 @@
     "leakage_audit_bitemporal": "duckdb",
     "baselines_signal_divergence_and_timeline": "in_memory_reference"
   },
+  "facts_in_source": 245551,
   "facts": 3951,
   "source_snapshots": [
     "01ddc6ffa741f0a7da440e2949b2ed19cec14fab35435a398e3f3d0100019715",
@@ -113,31 +114,31 @@
     "tolerance": 1e-06,
     "conflicting_original_periods_excluded": 0,
     "overall": {
-      "periods": 1561,
-      "periods_with_later_filings": 1301,
+      "periods": 1552,
+      "periods_with_later_filings": 1302,
       "periods_revised": 136,
-      "revised_share_of_periods": 0.08712363869314542,
-      "revised_share_of_refiled_periods": 0.10453497309761722,
+      "revised_share_of_periods": 0.08762886597938144,
+      "revised_share_of_refiled_periods": 0.10445468509984639,
       "issuers_with_a_revision": 24,
       "median_abs_relative_change": 0.010070680085639033,
       "p90_abs_relative_change": 0.16033057851239668,
       "share_of_revisions_above_1pct": 0.5,
       "median_revision_lag_days": 367.0,
-      "median_days_period_end_to_first_filing": 51
+      "median_days_period_end_to_first_filing": 51.0
     },
     "by_concept": {
       "us-gaap:NetIncomeLoss": {
-        "periods": 713,
-        "periods_with_later_filings": 628,
+        "periods": 710,
+        "periods_with_later_filings": 629,
         "periods_revised": 47,
-        "revised_share_of_periods": 0.06591865357643759,
-        "revised_share_of_refiled_periods": 0.07484076433121019,
+        "revised_share_of_periods": 0.06619718309859154,
+        "revised_share_of_refiled_periods": 0.07472178060413355,
         "issuers_with_a_revision": 19,
         "median_abs_relative_change": 0.005231388329979879,
         "p90_abs_relative_change": 0.2020845123561592,
         "share_of_revisions_above_1pct": 0.3829787234042553,
         "median_revision_lag_days": 367,
-        "median_days_period_end_to_first_filing": 51
+        "median_days_period_end_to_first_filing": 51.0
       },
       "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax": {
         "periods": 208,
@@ -153,10 +154,10 @@
         "median_days_period_end_to_first_filing": 45.0
       },
       "us-gaap:Revenues": {
-        "periods": 473,
+        "periods": 469,
         "periods_with_later_filings": 384,
         "periods_revised": 61,
-        "revised_share_of_periods": 0.12896405919661733,
+        "revised_share_of_periods": 0.1300639658848614,
         "revised_share_of_refiled_periods": 0.15885416666666666,
         "issuers_with_a_revision": 16,
         "median_abs_relative_change": 0.007877357514026044,
@@ -166,10 +167,10 @@
         "median_days_period_end_to_first_filing": 53
       },
       "us-gaap:SalesRevenueNet": {
-        "periods": 167,
+        "periods": 165,
         "periods_with_later_filings": 131,
         "periods_revised": 22,
-        "revised_share_of_periods": 0.1317365269461078,
+        "revised_share_of_periods": 0.13333333333333333,
         "revised_share_of_refiled_periods": 0.16793893129770993,
         "issuers_with_a_revision": 6,
         "median_abs_relative_change": 0.027275706977600143,
@@ -499,6 +500,40 @@
     }
   },
   "leakage_queries": 15543,
+  "leaked_answer_breakdown": {
+    "vector": {
+      "leaked_answers": 11537,
+      "right_value_later_filing": 322,
+      "right_value_same_day_filing": 3,
+      "different_fiscal_period": 11204,
+      "restated_value_same_period": 8,
+      "other": 0
+    },
+    "overwrite": {
+      "leaked_answers": 14257,
+      "right_value_later_filing": 10793,
+      "right_value_same_day_filing": 0,
+      "different_fiscal_period": 2243,
+      "restated_value_same_period": 1221,
+      "other": 0
+    },
+    "period_end": {
+      "leaked_answers": 14257,
+      "right_value_later_filing": 10793,
+      "right_value_same_day_filing": 0,
+      "different_fiscal_period": 2243,
+      "restated_value_same_period": 1221,
+      "other": 0
+    },
+    "bitemporal": {
+      "leaked_answers": 0,
+      "right_value_later_filing": 0,
+      "right_value_same_day_filing": 0,
+      "different_fiscal_period": 0,
+      "restated_value_same_period": 0,
+      "other": 0
+    }
+  },
   "signal_divergence": {
     "vector": {
       "signals": 5404,

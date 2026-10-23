@@ -5,7 +5,7 @@ import pytest
 from pit_memory import DuckDBStore, Fact, Query
 from pit_memory.store import select_latest
 
-needs_duckdb = pytest.mark.skipif(importlib.util.find_spec("duckdb") is None, reason="DuckDB dependency unavailable; install .[dev] to exercise storage")
+needs_duckdb = pytest.mark.skipif(importlib.util.find_spec("duckdb") is None, reason="DuckDB dependency unavailable; install the package to exercise storage")
 
 
 def fact(**changes):
@@ -130,3 +130,33 @@ def test_reference_latest_period_first_then_latest_filed():
              fact(value=120, period_start="2020-01-01", period_end="2020-12-31", filed="2021-02-15", available_on="2021-02-16", accession="0000000123-21-000001")]
     assert select_latest(query("2021-03-03"), facts).fact.value == 120
     assert select_latest(query("2021-03-03", period_end="2019-12-31"), facts).fact.value == 95
+
+
+@needs_duckdb
+@pytest.mark.parametrize("name, content", [("t.json", '{"a": 1}\n'), ("t.csv", "a,b\n1,2\n"), ("t.bin", "x" * 64)])
+def test_non_duckdb_files_are_refused_instead_of_silently_opened_in_memory(tmp_path, name, content):
+    path = tmp_path / name
+    path.write_text(content)
+    with pytest.raises(ValueError, match="not a DuckDB database"):
+        DuckDBStore(path)
+    assert path.read_text() == content
+
+
+@needs_duckdb
+def test_directory_and_missing_read_only_database_are_clear_errors(tmp_path):
+    with pytest.raises(ValueError, match="directory"):
+        DuckDBStore(tmp_path)
+    with pytest.raises(ValueError, match="does not exist"):
+        DuckDBStore(tmp_path / "missing.duckdb", read_only=True)
+    assert not (tmp_path / "missing.duckdb").exists()
+
+
+@needs_duckdb
+def test_read_only_readers_share_a_database_and_cannot_write(tmp_path):
+    path = tmp_path / "facts.duckdb"
+    with DuckDBStore(path) as store:
+        store.append([fact()])
+    with DuckDBStore(path, read_only=True) as first, DuckDBStore(path, read_only=True) as second:
+        assert first.retrieve(query("2020-03-01")).fact == second.retrieve(query("2020-03-01")).fact
+        with pytest.raises(Exception):
+            first.append([fact(value=1, accession="0000000123-20-000009")])

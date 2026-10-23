@@ -134,7 +134,8 @@ signals/returns and undersized cross-sections produce `null`, not zero. Paired I
 differences compare each baseline against bitemporal on the **same entities and
 dates**, so coverage changes cannot create an apparent paired benefit. Report
 both individual coverage and paired sample sizes. Bootstrap intervals resample
-dates and require at least two dates. They are descriptive; overlapping return
+dates and require at least two dates. Every backend uses the same seed, so
+backends with identical per-date ICs report identical intervals. They are descriptive; overlapping return
 horizons would require an appropriate block bootstrap before inference.
 
 The demo contains 24 fictional firms and 4 return dates. Its returns are
@@ -166,11 +167,20 @@ rate. The bound uses only information available on the question date. The
 same bound removes stale issuer-months from the signal comparison.
 This schedule is easier to interpret than the boundary-enriched cases, but its
 rates still depend on it. Because no question precedes the first availability
-date, the correct-abstention denominator is zero on this schedule. On a
-latest-annual schedule `overwrite` and `period_end` choose the same fact by
-construction: both take the newest fiscal period that has ended and its newest
-filing. They differ in what remains recoverable: the overwrite snapshot has
-discarded the original values, so no later date filter can repair it.
+date, the correct-abstention denominator is zero on this schedule.
+
+`overwrite` and `period_end` select the same fact for every question in this
+benchmark, by construction: both take the newest filing of the newest fiscal
+period that has ended, and the overwrite snapshot keeps exactly those newest
+filings. Their selected-answer metrics are therefore identical. They differ in
+what remains recoverable: `period_end` still stores every version and is fixed
+by adding an availability filter, while the overwrite snapshot has discarded
+the original values, so no later date filter can repair it.
+
+`leaked_answer_breakdown` in `study.json` classifies every answer that used an
+unavailable fact: the right value cited from a later filing (or one filed on
+the question date), a different fiscal year (usually one whose report was not
+yet filed), or a restated value for the right year.
 
 **Signal divergence.** Annual revenue growth is computed by every backend with
 the same code for every issuer and month. The report counts signals that match

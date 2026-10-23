@@ -1,6 +1,6 @@
 """SEC companyfacts ingestion preserving every dated annual filing version.
 
-Only annual duration facts are supported in this MVP. Taxonomy-qualified tags
+Only annual duration facts are supported. Taxonomy-qualified tags
 and units are kept separate; no unsupported tag equivalence is inferred.
 """
 from __future__ import annotations
@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 import hashlib
+import http.client
 import json
 import math
 import os
@@ -22,6 +23,17 @@ from .calendar import next_trading_session
 from .models import Fact, iso_date, normalize_cik
 
 ANNUAL_FORMS = frozenset({"10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A"})
+
+
+def _json_safe(value):
+    """Copy of a raw row with non-finite numbers as text, so reports stay valid JSON."""
+    if isinstance(value, float) and not math.isfinite(value):
+        return repr(value)
+    if isinstance(value, dict):
+        return {key: _json_safe(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(item) for item in value]
+    return value
 
 
 @dataclass
@@ -78,7 +90,7 @@ def parse_companyfacts(
                             result.skipped += 1
                             continue
                         # Instant balance-sheet facts have no start; deliberately
-                        # outside annual-flow MVP, not an inferred annual period.
+                        # outside the annual-flow scope, not an inferred annual period.
                         if "start" not in entry:
                             result.skipped += 1
                             continue
@@ -107,7 +119,8 @@ def parse_companyfacts(
                             result.facts.append(fact)
                             seen.add(fact.fact_id)
                     except (ValueError, TypeError, OverflowError) as exc:
-                        result.rejected.append({"concept": concept, "unit": unit, "reason": str(exc), "row": entry})
+                        result.rejected.append({"concept": concept, "unit": unit, "reason": str(exc),
+                                                "row": _json_safe(entry)})
     return result
 
 
@@ -134,12 +147,8 @@ class SecClient:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         pointer = self.cache_dir / f"CIK{cik}.latest.json"
         if pointer.is_file() and not refresh:
-            metadata = json.loads(pointer.read_text())
-            sha = metadata.get("sha256", "")
-            if not re.fullmatch(r"[0-9a-f]{64}", sha):
-                raise ValueError("Invalid cached snapshot digest")
-            cached = self.cache_dir / f"CIK{cik}.{sha}.json"
-            if cached.is_file() and hashlib.sha256(cached.read_bytes()).hexdigest() == sha:
+            cached = self._cached_snapshot(cik, pointer)
+            if cached is not None:
                 return cached
         url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
         last_error: Exception | None = None
@@ -157,10 +166,13 @@ class SecClient:
                     raise ValueError("SEC response does not match requested companyfacts CIK")
                 sha = hashlib.sha256(raw).hexdigest()
                 destination = self.cache_dir / f"CIK{cik}.{sha}.json"
-                if not destination.exists():
-                    # Exclusive creation never overwrites a raw snapshot.
-                    with destination.open("xb") as handle:
-                        handle.write(raw)
+                if not self._intact(destination, sha):
+                    # Write beside the target and rename, so an interrupted write
+                    # never leaves a truncated file under the snapshot's name. A
+                    # file whose bytes do not match its digest name is replaced.
+                    partial = destination.with_name(f"{destination.name}.{os.getpid()}.part")
+                    partial.write_bytes(raw)
+                    os.replace(partial, destination)
                 temp = pointer.with_suffix(".tmp")
                 temp.write_text(json.dumps({"cik": cik, "sha256": sha, "url": url}, indent=2) + "\n")
                 temp.replace(pointer)
@@ -171,13 +183,32 @@ class SecClient:
                     raise
                 retry_after = exc.headers.get("Retry-After", "") if exc.headers else ""
                 delay = min(float(retry_after), 30.0) if retry_after.isdigit() else min(2**attempt, 16)
-            except (URLError, TimeoutError) as exc:
+            except (URLError, TimeoutError, ConnectionError, http.client.HTTPException,
+                    json.JSONDecodeError) as exc:
+                # Includes dropped connections and truncated bodies.
                 last_error = exc
                 delay = min(2**attempt, 16)
             if attempt < self.retries:
                 time.sleep(delay)
         assert last_error is not None
-        raise last_error
+        raise RuntimeError(f"SEC download for CIK {cik} failed after {self.retries + 1} attempt(s): "
+                           f"{type(last_error).__name__}: {last_error}") from last_error
+
+    @staticmethod
+    def _intact(path: Path, sha: str) -> bool:
+        return path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == sha
+
+    def _cached_snapshot(self, cik: str, pointer: Path) -> Path | None:
+        """The cached file the pointer names, or None if anything is missing or damaged."""
+        try:
+            metadata = json.loads(pointer.read_text())
+        except (OSError, ValueError):
+            return None
+        sha = metadata.get("sha256") if isinstance(metadata, dict) else None
+        if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{64}", sha):
+            return None
+        cached = self.cache_dir / f"CIK{cik}.{sha}.json"
+        return cached if self._intact(cached, sha) else None
 
     def fetch_companyfacts(self, cik: str | int, refresh: bool = False) -> dict:
         return json.loads(self.download_companyfacts(cik, refresh=refresh).read_bytes())

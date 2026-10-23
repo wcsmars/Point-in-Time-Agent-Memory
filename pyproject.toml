@@ -1,17 +1,37 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "pit-agent-memory"
 version = "0.1.0"
-description = "Point-in-time financial fact retrieval and leakage evaluation"
+description = "Bitemporal SEC fact store and look-ahead leakage audit for financial research agents"
+authors = [{name = "Chung Shing Mars Wong"}]
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+]
+keywords = ["point-in-time", "bitemporal", "look-ahead-bias", "sec-edgar", "quantitative-finance", "retrieval"]
 dependencies = ["duckdb>=1.1,<2", "exchange-calendars>=4.5,<5"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<9"]
 plots = ["matplotlib>=3.7,<4"]
+
+[project.urls]
+Homepage = "https://github.com/wcsmars/Point-in-Time-Agent-Memory"
 
 [project.scripts]
 pit-memory = "pit_memory.cli:main"

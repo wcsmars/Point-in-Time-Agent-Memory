@@ -219,7 +219,7 @@ def evaluate_factor(
     per_date: list[dict[str, Any]] = []
     summaries: dict[str, Any] = {}
     dates = sorted({r.as_of for r in observations})
-    for index, backend in enumerate(BACKENDS):
+    for backend in BACKENDS:
         values: list[float] = []
         paired_deltas: list[float] = []
         for as_of in dates:
@@ -250,10 +250,11 @@ def evaluate_factor(
             "signal_coverage": len(successful) / len(observations) if observations else None,
             "signal_rows_with_future_facts": sum(t["answer_leakage"] for t in successful),
             "dates_with_defined_ic": len(values), "mean_ic": mean(values) if values else None,
-            "mean_ic_ci95": _bootstrap_mean(values, bootstrap_samples, seed + index),
+            # One seed for every backend: identical inputs get identical intervals.
+            "mean_ic_ci95": _bootstrap_mean(values, bootstrap_samples, seed),
             "paired_dates": len(paired_deltas),
             "paired_mean_delta_ic_vs_bitemporal": mean(paired_deltas) if paired_deltas else None,
-            "paired_delta_ci95": _bootstrap_mean(paired_deltas, bootstrap_samples, seed + index),
+            "paired_delta_ci95": _bootstrap_mean(paired_deltas, bootstrap_samples, seed + 1),
         }
     return {
         "factor": "annual_revenue_growth", "concept": concept, "unit": unit,

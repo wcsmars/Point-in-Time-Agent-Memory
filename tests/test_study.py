@@ -172,3 +172,27 @@ def test_revision_record_names_both_filings():
     assert record["original_accession"] == "2-21"
     assert record["first_revision_accession"] == "2-22"
     assert record["days_period_end_to_first_filing"] == 43
+
+
+def test_start_date_conventions_of_one_fiscal_year_are_one_period():
+    a = filing(7, 2020, 50, "2021-02-12", "2021-02-16", "7-a")
+    b = replace(a, period_start="2019-12-31", filed="2022-02-15", available_on="2022-02-16",
+                accession="7-b", fact_id="")
+    profile = revision_profile([a, b])
+    assert profile["overall"]["periods"] == 1
+    assert profile["overall"]["periods_revised"] == 0
+    assert profile["records"][0]["start_dates_seen"] == 2
+
+
+def test_leak_breakdown_classifies_each_leaked_answer():
+    from pit_memory.study import leak_breakdown
+    rows = history(1, restated=95)
+    cases = scheduled_cases(rows, ["2021-02-01", "2021-03-01", "2022-01-15"])
+    report = evaluate(rows, cases, bootstrap_samples=0)
+    counts = leak_breakdown(report["traces"])["period_end"]
+    # 2021-02-01: FY2020 not filed yet; 2021-03-01: FY2020 restated value from 2022;
+    # 2022-01-15: FY2021 not filed yet.
+    assert counts["leaked_answers"] == 3
+    assert counts["different_fiscal_period"] == 2
+    assert counts["restated_value_same_period"] == 1
+    assert leak_breakdown(report["traces"])["bitemporal"]["leaked_answers"] == 0

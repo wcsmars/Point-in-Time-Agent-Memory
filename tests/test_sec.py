@@ -82,11 +82,61 @@ def test_cache_snapshot_integrity_without_network(tmp_path, monkeypatch):
     assert client.fetch_companyfacts("123")["cik"] == 123
 
 
-def test_malformed_cache_digest_rejected(tmp_path):
-    (tmp_path / "CIK0000000123.latest.json").write_text('{"sha256":"../../outside"}')
+@pytest.mark.parametrize("pointer", ['{"sha256":"../../outside"}', "[]", '{"sha256": 5}', "not json"])
+def test_damaged_cache_pointer_is_never_followed_and_triggers_a_fresh_download(tmp_path, monkeypatch, pointer):
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    (cache / "CIK0000000123.latest.json").write_text(pointer)
+    raw = json.dumps(payload([row()])).encode()
+    monkeypatch.setattr("pit_memory.sec.urlopen", lambda request, timeout: BytesIO(raw))
+    client = SecClient(cache, "Offline fixture contact@example.test")
+    path = client.download_companyfacts("123")
+    assert path.parent == cache and path.read_bytes() == raw
+    assert json.loads((cache / "CIK0000000123.latest.json").read_text())["sha256"] in path.name
+
+
+def test_truncated_snapshot_is_replaced_by_a_complete_download(tmp_path, monkeypatch):
+    raw = json.dumps(payload([row()])).encode()
+    sha = hashlib.sha256(raw).hexdigest()
+    damaged = tmp_path / f"CIK0000000123.{sha}.json"
+    damaged.write_bytes(raw[:10])  # an interrupted earlier write
+    (tmp_path / "CIK0000000123.latest.json").write_text(json.dumps({"sha256": sha}))
+    monkeypatch.setattr("pit_memory.sec.urlopen", lambda request, timeout: BytesIO(raw))
     client = SecClient(tmp_path, "Offline fixture contact@example.test")
-    with pytest.raises(ValueError, match="digest"):
-        client.download_companyfacts("123")
+    assert client.download_companyfacts("123").read_bytes() == raw
+    assert client.fetch_companyfacts("123")["cik"] == 123
+    assert not list(tmp_path.glob("*.part"))
+
+
+def test_dropped_connections_and_truncated_bodies_are_retried(tmp_path, monkeypatch):
+    import http.client
+    raw = json.dumps(payload([row()])).encode()
+    failures = [http.client.IncompleteRead(b"{", 100), ConnectionResetError("reset"), None]
+    attempts = []
+
+    def flaky(request, timeout):
+        attempts.append(1)
+        failure = failures[len(attempts) - 1]
+        if failure is not None:
+            raise failure
+        return BytesIO(raw)
+
+    monkeypatch.setattr("pit_memory.sec.urlopen", flaky)
+    monkeypatch.setattr("pit_memory.sec.time.sleep", lambda _seconds: None)
+    client = SecClient(tmp_path, "Offline fixture contact@example.test")
+    assert client.download_companyfacts("123").read_bytes() == raw
+    assert len(attempts) == 3
+    monkeypatch.setattr("pit_memory.sec.urlopen", lambda request, timeout: BytesIO(raw[:20]))
+    with pytest.raises(RuntimeError, match="failed after 4 attempt"):
+        client.download_companyfacts("123", refresh=True)
+
+
+def test_rejected_rows_with_non_finite_values_stay_json_safe():
+    bad = row(val=float("nan"))
+    result = parse_companyfacts(payload([bad, row()]), calendar=fake_calendar)
+    assert len(result.facts) == 1
+    assert result.rejected[0]["row"]["val"] == "nan"
+    json.dumps(result.rejected, allow_nan=False)
 
 
 def test_download_refresh_preserves_raw_snapshots_and_exact_bytes(tmp_path, monkeypatch):

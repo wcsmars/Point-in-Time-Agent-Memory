@@ -9,6 +9,8 @@ import os
 from pathlib import Path
 import sys
 
+from . import __version__
+
 
 def _print(value: object) -> None:
     print(json.dumps(value, indent=2, sort_keys=True, allow_nan=False))
@@ -19,11 +21,30 @@ def _dump(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n")
 
 
-def _import_file(path: Path, store) -> dict:
+DEFAULT_STUDY_CONCEPTS = (
+    "us-gaap:Revenues",
+    "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+    "us-gaap:SalesRevenueNet",
+    "us-gaap:NetIncomeLoss",
+)
+
+
+def _parse_file(path: Path):
+    """Read and validate one companyfacts file before anything is written."""
     from .sec import parse_companyfacts
 
     raw = path.read_bytes()
-    parsed = parse_companyfacts(json.loads(raw), source_sha256=hashlib.sha256(raw).hexdigest())
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path}: not a companyfacts JSON document ({exc})") from exc
+    try:
+        return parse_companyfacts(payload, source_sha256=hashlib.sha256(raw).hexdigest())
+    except ValueError as exc:
+        raise ValueError(f"{path}: {exc}") from exc
+
+
+def _import_parsed(path: Path, parsed, store) -> dict:
     inserted = store.append(parsed.facts)
     return {
         "source": str(path.resolve()), "source_sha256": parsed.source_sha256,
@@ -32,91 +53,110 @@ def _import_file(path: Path, store) -> dict:
     }
 
 
+def _import_file(path: Path, store) -> dict:
+    return _import_parsed(path, _parse_file(path), store)
+
+
+class _HelpFormatter(argparse.ArgumentDefaultsHelpFormatter):
+    """Show defaults only where there is one."""
+
+    def _get_help_string(self, action):
+        if action.default in (None, False) or action.help is None:
+            return action.help
+        return super()._get_help_string(action)
+
+
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Point-in-time financial memory and leakage audit")
-    commands = p.add_subparsers(dest="command", required=True)
-    demo = commands.add_parser("demo", help="Run the labelled, offline synthetic benchmark")
-    demo.add_argument("--output", type=Path, default=Path("runs/demo"))
+    fmt = _HelpFormatter
+    p = argparse.ArgumentParser(
+        prog="pit-memory", formatter_class=fmt,
+        description="Point-in-time SEC fact store and look-ahead leakage audit for research agents")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    commands = p.add_subparsers(dest="command", required=True, metavar="command")
 
-    imp = commands.add_parser("import-sec", help="Append annual facts from companyfacts JSON")
-    imp.add_argument("files", nargs="+", type=Path)
-    imp.add_argument("--db", type=Path, default=Path("data/sec.duckdb"))
-    imp.add_argument("--report", type=Path, default=Path("runs/import-report.json"))
+    def command(name: str, text: str) -> argparse.ArgumentParser:
+        return commands.add_parser(name, help=text, description=text, formatter_class=fmt)
 
-    fetch = commands.add_parser("fetch-sec", help="Download companyfacts with SEC_USER_AGENT")
+    demo = command("demo", "Run the labelled, offline synthetic benchmark and factor check")
+    demo.add_argument("--output", type=Path, default=Path("runs/demo"), help="output folder")
+
+    imp = command("import-sec", "Append annual facts from downloaded SEC companyfacts JSON files")
+    imp.add_argument("files", nargs="+", type=Path, help="companyfacts JSON files (CIK##########.json)")
+    imp.add_argument("--db", type=Path, default=Path("data/sec.duckdb"), help="DuckDB database to append to")
+    imp.add_argument("--report", type=Path, default=Path("runs/import-report.json"),
+                     help="where to write accepted/rejected row counts")
+
+    load = command("import-facts", "Append facts from a JSONL file (e.g. the bundled SEC sample) to DuckDB")
+    load.add_argument("files", nargs="+", type=Path, help="facts JSONL files written by export-facts")
+    load.add_argument("--db", type=Path, default=Path("data/sec.duckdb"), help="DuckDB database to append to")
+
+    fetch = command("fetch-sec", "Download companyfacts from SEC (needs SEC_USER_AGENT) and import them")
     sources = fetch.add_mutually_exclusive_group(required=True)
-    sources.add_argument("--cik", action="append", help="Repeat to download several issuers")
-    sources.add_argument("--ciks-file", type=Path, help="One numeric CIK per line; # comments allowed")
-    fetch.add_argument("--db", type=Path, default=Path("data/sec.duckdb"))
-    fetch.add_argument("--cache", type=Path, default=Path("data/raw"))
-    fetch.add_argument("--report", type=Path, default=Path("runs/fetch-report.json"))
-    fetch.add_argument("--refresh", action="store_true")
+    sources.add_argument("--cik", action="append", help="CIK to download; repeat for several issuers")
+    sources.add_argument("--ciks-file", type=Path, help="one numeric CIK per line; text after # is ignored")
+    fetch.add_argument("--db", type=Path, default=Path("data/sec.duckdb"), help="DuckDB database to append to")
+    fetch.add_argument("--cache", type=Path, default=Path("data/raw"), help="folder for raw downloads")
+    fetch.add_argument("--report", type=Path, default=Path("runs/fetch-report.json"), help="import report")
+    fetch.add_argument("--refresh", action="store_true", help="download again even if a cached copy exists")
 
-    query = commands.add_parser("query", help="Retrieve a cited annual value as of a date")
-    query.add_argument("--db", type=Path, required=True)
-    query.add_argument("--cik", required=True)
-    query.add_argument("--concept", required=True, help="Namespace-qualified SEC concept")
-    query.add_argument("--unit", default="USD")
-    query.add_argument("--as-of", required=True, help="YYYY-MM-DD; daily availability convention")
-    query.add_argument("--period-end", help="Optional exact fiscal period end")
+    query = command("query", "Retrieve one cited annual value as it was known on a date")
+    query.add_argument("--db", type=Path, required=True, help="DuckDB fact database")
+    query.add_argument("--cik", required=True, help="SEC Central Index Key, digits only")
+    query.add_argument("--concept", required=True, help="namespace-qualified concept, e.g. us-gaap:Revenues")
+    query.add_argument("--unit", default="USD", help="reporting unit")
+    query.add_argument("--as-of", required=True, help="knowledge date YYYY-MM-DD")
+    query.add_argument("--period-end", help="exact fiscal period end YYYY-MM-DD (default: latest annual)")
     query.add_argument("--backend", choices=("bitemporal", "vector", "overwrite", "period_end"),
-                       default="bitemporal")
+                       default="bitemporal", help="retrieval design to use")
 
-    audit = commands.add_parser("evaluate", help="Generate boundary cases and audit a fact database")
-    audit.add_argument("--db", type=Path, required=True)
-    audit.add_argument("--output", type=Path, default=Path("runs/audit"))
-    audit.add_argument("--bootstrap-samples", type=int, default=500)
-    audit.add_argument("--seed", type=int, default=7)
-    audit.add_argument("--concept", help="Optional exact concept to restrict the audit")
+    audit = command("evaluate", "Audit all backends on boundary questions around every filing date")
+    audit.add_argument("--db", type=Path, required=True, help="DuckDB fact database")
+    audit.add_argument("--output", type=Path, default=Path("runs/audit"), help="output folder")
+    audit.add_argument("--bootstrap-samples", type=int, default=500, help="issuer-cluster bootstrap draws")
+    audit.add_argument("--seed", type=int, default=7, help="bootstrap seed")
+    audit.add_argument("--concept", help="restrict the audit to one exact concept (recommended)")
 
-    factor = commands.add_parser("factor", help="Compare annual-growth IC using an audited returns CSV")
-    factor.add_argument("--db", type=Path, required=True)
+    factor = command("factor", "Compare revenue-growth rank IC across backends using a returns CSV you supply")
+    factor.add_argument("--db", type=Path, required=True, help="DuckDB fact database")
     factor.add_argument("--returns", type=Path, required=True,
-                        help="CSV columns: cik,as_of,forward_return,return_end (optional)")
-    factor.add_argument("--concept", default="us-gaap:Revenues")
-    factor.add_argument("--unit", default="USD")
-    factor.add_argument("--output", type=Path, default=Path("runs/factor.json"))
-    factor.add_argument("--min-entities", type=int, default=3)
-    factor.add_argument("--bootstrap-samples", type=int, default=500)
-    factor.add_argument("--seed", type=int, default=17)
+                        help="CSV with columns cik,as_of,forward_return and optional return_end")
+    factor.add_argument("--concept", default="us-gaap:Revenues", help="revenue concept for the signal")
+    factor.add_argument("--unit", default="USD", help="reporting unit")
+    factor.add_argument("--output", type=Path, default=Path("runs/factor.json"), help="report path")
+    factor.add_argument("--min-entities", type=int, default=3, help="minimum issuers per date for an IC")
+    factor.add_argument("--bootstrap-samples", type=int, default=500, help="date bootstrap draws")
+    factor.add_argument("--seed", type=int, default=17, help="bootstrap seed")
 
-    study = commands.add_parser("study", help="Revision profile, scheduled leakage audit and signal drift")
+    study = command("study", "Revision profile, scheduled leakage audit and signal divergence")
     source = study.add_mutually_exclusive_group(required=True)
-    source.add_argument("--db", type=Path, help="DuckDB fact database (bitemporal answers come from SQL)")
-    source.add_argument("--facts", type=Path, help="Facts JSONL, e.g. examples/sample-data/sec-facts-sample.jsonl")
+    source.add_argument("--db", type=Path, help="DuckDB fact database (point-in-time answers come from SQL)")
+    source.add_argument("--facts", type=Path, help="facts JSONL (in-memory reference implementation)")
     study.add_argument("--concept", action="append", dest="concepts",
-                       help="Namespace-qualified concept; repeat for several (default: revenue tags)")
-    study.add_argument("--signal-concept", default="us-gaap:Revenues")
-    study.add_argument("--unit", default="USD")
-    study.add_argument("--start", default="2012-01-01")
-    study.add_argument("--end", default="2025-12-31")
+                       help="concept to include; repeat for several (default: "
+                            + ", ".join(DEFAULT_STUDY_CONCEPTS) + ")")
+    study.add_argument("--signal-concept", default="us-gaap:Revenues", help="concept for the growth signal")
+    study.add_argument("--unit", default="USD", help="reporting unit")
+    study.add_argument("--start", default="2010-01-01", help="first question month (YYYY-MM-DD)")
+    study.add_argument("--end", default="2026-10-01", help="last question month (YYYY-MM-DD)")
     study.add_argument("--universe", type=Path, help="CIK list with '# name' comments, for labels")
-    study.add_argument("--output", type=Path, default=Path("runs/sec-study"))
-    study.add_argument("--bootstrap-samples", type=int, default=500)
-    study.add_argument("--seed", type=int, default=7)
+    study.add_argument("--output", type=Path, default=Path("runs/sec-study"), help="output folder")
+    study.add_argument("--bootstrap-samples", type=int, default=500, help="issuer-cluster bootstrap draws")
+    study.add_argument("--seed", type=int, default=7, help="bootstrap seed")
     study.add_argument("--max-age-days", type=int, default=550,
-                       help="Drop questions whose point-in-time answer is older than this (stale series)")
+                       help="skip a question when the point-in-time answer's fiscal year ended longer ago")
 
-    plot = commands.add_parser("plot", help="Draw figures from a study and a demo run (needs matplotlib)")
-    plot.add_argument("--study", type=Path, help="Output folder of the study command")
-    plot.add_argument("--demo", type=Path, help="Output folder of the demo command")
-    plot.add_argument("--output", type=Path, default=Path("figures"))
+    plot = command("plot", "Draw the README figures from study and demo outputs (needs .[plots])")
+    plot.add_argument("--study", type=Path, help="output folder of the study command")
+    plot.add_argument("--demo", type=Path, help="output folder of the demo command")
+    plot.add_argument("--output", type=Path, default=Path("runs/figures"), help="folder for PNG files")
 
-    export = commands.add_parser("export-facts", help="Write facts of selected issuers and concepts as JSONL")
-    export.add_argument("--db", type=Path, required=True)
-    export.add_argument("--cik", action="append", required=True)
-    export.add_argument("--concept", action="append", required=True)
-    export.add_argument("--unit", default="USD")
-    export.add_argument("--output", type=Path, required=True)
+    export = command("export-facts", "Write facts of selected issuers and concepts as JSONL")
+    export.add_argument("--db", type=Path, required=True, help="DuckDB fact database")
+    export.add_argument("--cik", action="append", required=True, help="CIK to include; repeat for several")
+    export.add_argument("--concept", action="append", required=True, help="concept to include; repeat")
+    export.add_argument("--unit", default="USD", help="reporting unit")
+    export.add_argument("--output", type=Path, required=True, help="JSONL file to write")
     return p
-
-
-DEFAULT_STUDY_CONCEPTS = (
-    "us-gaap:Revenues",
-    "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
-    "us-gaap:SalesRevenueNet",
-    "us-gaap:NetIncomeLoss",
-)
 
 
 def _run_study(args) -> dict:
@@ -131,7 +171,7 @@ def _run_study(args) -> dict:
     from .store import DuckDBStore
     if not args.db.is_file():
         raise ValueError(f"Database does not exist: {args.db}; import SEC facts first")
-    with DuckDBStore(args.db) as store:
+    with DuckDBStore(args.db, read_only=True) as store:
         return run_study(store.all_facts(), args.output, bitemporal_retriever=store.retrieve,
                          storage="duckdb", **options)
 
@@ -172,13 +212,21 @@ def main(argv: list[str] | None = None) -> int:
         args.db.parent.mkdir(parents=True, exist_ok=True)
 
         if args.command == "import-sec":
+            parsed = [(path, _parse_file(path)) for path in args.files]  # validate before writing
             reports = []
             with DuckDBStore(args.db) as store:
-                for path in args.files:
-                    reports.append(_import_file(path, store))
-            _dump(args.report, {"imports": reports})
+                for path, result in parsed:
+                    reports.append(_import_parsed(path, result, store))
+                    _dump(args.report, {"imports": reports})  # kept even if a later file fails
             _print({"database": str(args.db.resolve()), "report": str(args.report.resolve()),
                     "inserted": sum(report["inserted"] for report in reports)})
+        elif args.command == "import-facts":
+            from .study import facts_from_jsonl
+            batches = [facts_from_jsonl(path) for path in args.files]  # validate before writing
+            with DuckDBStore(args.db) as store:
+                inserted = sum(store.append(batch) for batch in batches)
+                total = len(store.all_facts())
+            _print({"database": str(args.db), "inserted": inserted, "facts_in_database": total})
         elif args.command == "fetch-sec":
             from .models import normalize_cik
             from .sec import SecClient
@@ -202,13 +250,13 @@ def main(argv: list[str] | None = None) -> int:
             from .models import Query
             from .backends import retrieve
             q = Query("cli", args.cik, args.concept, args.unit, args.as_of, args.period_end)
-            with DuckDBStore(args.db) as store:
+            with DuckDBStore(args.db, read_only=True) as store:
                 result = (store.retrieve(q) if args.backend == "bitemporal"
                           else retrieve(store.all_facts(), q, args.backend))
             _print(asdict(result))
         elif args.command == "evaluate":
             from .evaluation import evaluate, write_evaluation
-            with DuckDBStore(args.db) as store:
+            with DuckDBStore(args.db, read_only=True) as store:
                 facts = store.all_facts()
                 if args.concept:
                     facts = [fact for fact in facts if fact.concept == args.concept]
@@ -225,7 +273,7 @@ def main(argv: list[str] | None = None) -> int:
             from .models import normalize_cik
             from .study import write_facts_jsonl
             ciks, concepts = {normalize_cik(c) for c in args.cik}, set(args.concept)
-            with DuckDBStore(args.db) as store:
+            with DuckDBStore(args.db, read_only=True) as store:
                 facts = [f for f in store.all_facts()
                          if f.cik in ciks and f.concept in concepts and f.unit == args.unit]
             if not facts:
@@ -234,7 +282,7 @@ def main(argv: list[str] | None = None) -> int:
             _print({"facts": write_facts_jsonl(facts, args.output), "output": str(args.output)})
         elif args.command == "factor":
             from .factor import evaluate_factor, load_returns
-            with DuckDBStore(args.db) as store:
+            with DuckDBStore(args.db, read_only=True) as store:
                 facts = store.all_facts()
             if not facts:
                 raise ValueError("No facts to evaluate")
@@ -247,11 +295,17 @@ def main(argv: list[str] | None = None) -> int:
             _print({"factor_report": str(args.output.resolve())})
         return 0
     except ImportError as exc:
-        print(f"pit-memory: {exc}. Install dependencies with python -m pip install -e '.[dev]'. "
-              "The demo can run from source without them.", file=sys.stderr)
+        extra = "plots" if "matplotlib" in str(exc) else "dev"
+        print(f"pit-memory: {exc}. Install it with python -m pip install -e '.[{extra}]'. "
+              "The demo also runs from source without DuckDB.", file=sys.stderr)
         return 2
     except (ValueError, OSError, RuntimeError) as exc:
         print(f"pit-memory: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:  # database engine errors are not OSError subclasses
+        if type(exc).__module__.split(".")[0].lstrip("_") != "duckdb":
+            raise
+        print(f"pit-memory: database error: {exc}", file=sys.stderr)
         return 2
 
 

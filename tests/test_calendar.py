@@ -3,7 +3,7 @@ import importlib.util
 
 from pit_memory.calendar import next_trading_session
 
-pytestmark = pytest.mark.skipif(importlib.util.find_spec("exchange_calendars") is None, reason="exchange_calendars dependency unavailable; install .[dev] to test real XNYS sessions")
+pytestmark = pytest.mark.skipif(importlib.util.find_spec("exchange_calendars") is None, reason="exchange_calendars dependency unavailable; install the package to test real XNYS sessions")
 
 
 @pytest.mark.parametrize("filed,expected", [

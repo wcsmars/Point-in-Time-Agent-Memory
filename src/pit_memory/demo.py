@@ -91,7 +91,10 @@ def run_demo(output_dir: str | Path, issuers: int = 24, bootstrap_samples: int =
     # Avoid mixing real imports or a differently seeded fixture into the demo.
     facts_path = directory / "synthetic-facts.jsonl"
     if facts_path.exists():
-        old_ids = {json.loads(line)["fact_id"] for line in facts_path.read_text().splitlines() if line}
+        try:
+            old_ids = {json.loads(line)["fact_id"] for line in facts_path.read_text().splitlines() if line}
+        except (ValueError, KeyError, TypeError) as exc:
+            raise ValueError(f"{facts_path} is not a demo output; use a new output directory") from exc
         if old_ids != {fact.fact_id for fact in data.facts}:
             raise ValueError("output contains a different dataset; use a new output directory")
     db_path = directory / "demo.duckdb"

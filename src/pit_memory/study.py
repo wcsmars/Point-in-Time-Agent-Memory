@@ -66,15 +66,17 @@ def _differs(a: float, b: float) -> bool:
 def revision_profile(facts: Iterable[Fact]) -> dict:
     """Describe how later filings restate fiscal periods that were already public.
 
-    A period is identified by CIK, concept, unit, start and end. Its original
-    value comes from the earliest filing date. A period is *revised* when any
-    later filing reports a different value. Periods whose earliest filing date
-    already carries conflicting values are counted separately and excluded
-    from the revision statistics.
+    A period is identified by CIK, concept, unit and fiscal period end. Facts
+    are already restricted to annual durations, so one end date is one fiscal
+    year even when filings disagree by a day on its start (both conventions
+    occur in SEC data). Its original value comes from the earliest filing date.
+    A period is *revised* when any later filing reports a different value.
+    Periods whose earliest filing date already carries conflicting values are
+    counted separately and excluded from the revision statistics.
     """
     groups: dict[tuple, list[Fact]] = defaultdict(list)
     for fact in facts:
-        groups[(fact.cik, fact.concept, fact.unit, fact.period_start, fact.period_end)].append(fact)
+        groups[(fact.cik, fact.concept, fact.unit, fact.period_end)].append(fact)
     records = []
     conflicting = 0
     for key, rows in groups.items():
@@ -90,7 +92,8 @@ def revision_profile(facts: Iterable[Fact]) -> dict:
         final = rows[-1]
         record = {
             "cik": key[0], "concept": key[1], "unit": key[2],
-            "period_start": key[3], "period_end": key[4],
+            "period_start": original.period_start, "period_end": key[3],
+            "start_dates_seen": len({fact.period_start for fact in rows}),
             "filings": len({fact.filed for fact in rows}),
             "original_value": original.value, "original_filed": original.filed,
             "original_accession": original.accession,
@@ -140,6 +143,38 @@ def revision_profile(facts: Iterable[Fact]) -> dict:
         "by_concept": {concept: summarize(rows) for concept, rows in sorted(by_concept.items())},
         "records": records,
     }
+
+
+def leak_breakdown(traces: Iterable[dict]) -> dict[str, dict[str, int]]:
+    """Classify every answer that used a fact not yet available on the question date.
+
+    ``right_value_later_filing``: correct number, cited from a filing made after
+    the question date (for example a comparative in the next 10-K).
+    ``right_value_same_day_filing``: correct number, filed on the question date
+    itself, which the conservative next-session rule treats as unavailable.
+    ``different_fiscal_period``: a fiscal year other than the point-in-time one,
+    usually a year whose report had not been filed yet.
+    ``restated_value_same_period``: the right fiscal year with a later value.
+    """
+    result: dict[str, dict[str, int]] = {}
+    for row in traces:
+        counts = result.setdefault(row["backend"], {
+            "leaked_answers": 0, "right_value_later_filing": 0, "right_value_same_day_filing": 0,
+            "different_fiscal_period": 0, "restated_value_same_period": 0, "other": 0})
+        if not row["answer_leaked"]:
+            continue
+        counts["leaked_answers"] += 1
+        answer = row["answer"]
+        if row["correct"]:
+            later = answer["filed"] > row["query"]["as_of"]
+            counts["right_value_later_filing" if later else "right_value_same_day_filing"] += 1
+        elif row["expected_period_end"] is not None and answer["period_end"] != row["expected_period_end"]:
+            counts["different_fiscal_period"] += 1
+        elif row["expected_period_end"] is not None:
+            counts["restated_value_same_period"] += 1
+        else:
+            counts["other"] += 1
+    return result
 
 
 def signal_divergence(facts: Sequence[Fact], ciks: Iterable[str], dates: Iterable[str],
@@ -290,6 +325,7 @@ def run_study(facts: Sequence[Fact], output_dir: str | Path, *, concepts: Sequen
         f"while the point-in-time answer is at most {max_age_days} days past fiscal year end")
     report["dataset"]["concepts"] = list(concepts)
     report["storage_mode"] = storage
+    breakdown = leak_breakdown(report["traces"])
     paths = write_evaluation(report, directory / "leakage", compress=True)
 
     signal_ciks = sorted({fact.cik for fact in selected if fact.concept == signal_concept})
@@ -323,6 +359,7 @@ def run_study(facts: Sequence[Fact], output_dir: str | Path, *, concepts: Sequen
                      "dates": len(schedule), "max_answer_age_days": max_age_days},
         "engines": {"leakage_audit_bitemporal": storage,
                     "baselines_signal_divergence_and_timeline": "in_memory_reference"},
+        "facts_in_source": len(facts),
         "facts": len(selected),
         "source_snapshots": sorted({fact.source_sha256 for fact in selected}),
         "storage_mode": storage,
@@ -330,6 +367,7 @@ def run_study(facts: Sequence[Fact], output_dir: str | Path, *, concepts: Sequen
         "leakage": {backend: {name: metric for name, metric in summary["metrics"].items()}
                     for backend, summary in report["backends"].items()},
         "leakage_queries": len(cases),
+        "leaked_answer_breakdown": breakdown,
         "signal_divergence": divergence["summary"],
         "example_revision": timeline,
         "caveats": [
