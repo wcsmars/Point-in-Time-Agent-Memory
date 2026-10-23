@@ -1,0 +1,917 @@
+{
+  "schema_version": 1,
+  "kind": "sec_companyfacts_study",
+  "universe": {
+    "issuers": 40,
+    "names": {
+      "0000001800": "Abbott Laboratories",
+      "0000012927": "Boeing",
+      "0000018230": "Caterpillar",
+      "0000019617": "JPMorgan Chase",
+      "0000021344": "Coca-Cola",
+      "0000034088": "Exxon Mobil",
+      "0000050863": "Intel",
+      "0000051143": "IBM",
+      "0000063908": "McDonald's",
+      "0000070858": "Bank of America",
+      "0000072971": "Wells Fargo",
+      "0000077476": "PepsiCo",
+      "0000078003": "Pfizer",
+      "0000080424": "Procter & Gamble",
+      "0000093410": "Chevron",
+      "0000097476": "Texas Instruments",
+      "0000104169": "Walmart",
+      "0000200406": "Johnson & Johnson",
+      "0000310158": "Merck",
+      "0000318154": "Amgen",
+      "0000320187": "Nike",
+      "0000320193": "Apple",
+      "0000354950": "Home Depot",
+      "0000731766": "UnitedHealth Group",
+      "0000789019": "Microsoft",
+      "0000796343": "Adobe",
+      "0000804328": "Qualcomm",
+      "0000831001": "Citigroup",
+      "0000858877": "Cisco Systems",
+      "0000886982": "Goldman Sachs",
+      "0000909832": "Costco",
+      "0001018724": "Amazon",
+      "0001045810": "NVIDIA",
+      "0001065280": "Netflix",
+      "0001108524": "Salesforce",
+      "0001141391": "Mastercard",
+      "0001326801": "Meta Platforms",
+      "0001341439": "Oracle",
+      "0001403161": "Visa",
+      "0001652044": "Alphabet"
+    }
+  },
+  "concepts": [
+    "us-gaap:Revenues",
+    "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+    "us-gaap:SalesRevenueNet",
+    "us-gaap:NetIncomeLoss"
+  ],
+  "unit": "USD",
+  "signal_concept": "us-gaap:Revenues",
+  "schedule": {
+    "frequency": "monthly",
+    "start": "2010-01-01",
+    "end": "2026-10-01",
+    "dates": 202,
+    "max_answer_age_days": 550
+  },
+  "engines": {
+    "leakage_audit_bitemporal": "duckdb",
+    "baselines_signal_divergence_and_timeline": "in_memory_reference"
+  },
+  "facts": 3951,
+  "source_snapshots": [
+    "01ddc6ffa741f0a7da440e2949b2ed19cec14fab35435a398e3f3d0100019715",
+    "0394e814d75510be107679b026e2df6e5d02d4f2029166911aa4924f9556681f",
+    "0c63f1ae7cc10b3c27e0c94f2add0c461e6293036dd4e52e52ae6dbb6f206e15",
+    "10fa1fafa25440b2159e2054dfe47628ba4ed353a258f526704cf9beda432bb8",
+    "15beaf33e3773633bffbfbafde7c0de9a2d65b206affa0da27c8ba163f4a53ee",
+    "19ef503a5770f5660964b3c3aea6937579d9b359da344afe6a9adf59c63d26ff",
+    "2aaba877f1dd992e067f1b9cfaacf78641d80dabb246e631b07e08e06309bbe8",
+    "49330f98609f70fcef4054edc90bc811398a58c4bf26dc0b218d607967a8dbe4",
+    "4a734cc934f3cf9f129fc15657589d4c6c82138f1bd889023c11170d97990d8d",
+    "4ed3b27dfb13ded21c2b3fda6ed072e2cb28896d0278889bf573435d5c284938",
+    "53d363a9aa3071406cda9857654358f4dca42e174a1defb8cc1ce9ad2a4c9e40",
+    "5d751f73769f5c0a1f9bee0de16cb39d8961cf3f1ebb5558d555bb2678afb4ff",
+    "5ee95bf56949988a4beaf0598e3acb0a012867228760cd9462a1c9e72526446f",
+    "614818b47aef21c2b996fd60c143d27c662b5f2079c91c9378c5eb34b3c0b8ef",
+    "65523545f040abaea1dfcf321da2a5aec85e7f34387244b0ffcb26e4c8707f7d",
+    "6c9dff59732b7c597542b2d5eadaae0313ca0de03defdba2c00203e693632d76",
+    "70056711b8b04d3a27e4a42b6d86e26f85ddaa3d59e480039d66ccfb353eb0b8",
+    "73a86c6aedc31f77cac2ea4df5f80f0b3bd7e6eb58bb4e01444fbedf3afb9c43",
+    "7549fb68446eee40e1f50a166fa06b2d2ee6349e07c8553a4828757e032d3cd4",
+    "78082e9cbae91bfa8c1480d214bd20c8d35fcbbcc72d71eaf01739c48b1e9511",
+    "78bda2f805b7d0b792a6217a66f62696930a88810fb61d79123ebb64312db7dc",
+    "86a5689aa9aa7b0f9e95be21b48b0305376e014c8dbf3b8bb3b4b131f1b6a0c4",
+    "9b95535419e5662e3deed01de803e83deead477a4c81316e1c45186368fdd8b8",
+    "9ce98e50414e9a6704eaf485e1868c2298c6ae36acc85a82c0a3737485303be7",
+    "a017f26ee88cb4a639d1c1ddb06d53b4afe22f0ac89cabec7cd67c88919fe1c5",
+    "aaf03befa1695d87ce1252bc08ca278b65be63782e46dc0b2858aab7a32c1be2",
+    "b675ced201b27ede2b0d26ca6fd873befe96a1afa9679339a2d0b964187dcdff",
+    "bb7a668b9d54074b397cd3ada697e4db1ab09a0f8fd7837ef83cf5345a9728f2",
+    "bd072131f9dcf001f22e843fded5910c2c7fc178e2a739ce0c58b1934e84d566",
+    "c09b160603412cb45acf1bb9bf3732e531dedfb548afa0e275fd8aefd7ab397e",
+    "c36bddafd22061dfe573fa22199074d882196f6667cf641eb30c8cec5a340ae5",
+    "d7aeceae21e6649e163d195729849349b27d909ab1a6eb4630a7c0c227acd890",
+    "dd0308149a8e96497989ed7c690b5a49a00bef9ceafbb24638bda41e8ae938dd",
+    "de2e92301923703e6aee247c42c0cf2f1b741118ebca221fbaa5dc0e47644bd7",
+    "df3caf7c5667296569fc3074ce2ff13629c9a555184a06c5ea9925b43e63971d",
+    "ecbeee451a002c65e854fd89c68c5e5762740427f9edba01f015d6bc668c3e43",
+    "f8d0e77ee4311d8db42ffa1f4f8e56750441af54ba0e4bc0cc1a2b742518ac46",
+    "f9f6cfb3c04bb8102552f121868831471a474165074ccc7c539f6f80f19d1b99",
+    "fd31bc147b36495f6912e063188aea71434077236f4e995268620b47fda99e61",
+    "fdf5906752dbed7151b14f5e765db25e75393cedef4a2582d976623b49e2e4c7"
+  ],
+  "storage_mode": "duckdb",
+  "revisions": {
+    "tolerance": 1e-06,
+    "conflicting_original_periods_excluded": 0,
+    "overall": {
+      "periods": 1561,
+      "periods_with_later_filings": 1301,
+      "periods_revised": 136,
+      "revised_share_of_periods": 0.08712363869314542,
+      "revised_share_of_refiled_periods": 0.10453497309761722,
+      "issuers_with_a_revision": 24,
+      "median_abs_relative_change": 0.010070680085639033,
+      "p90_abs_relative_change": 0.16033057851239668,
+      "share_of_revisions_above_1pct": 0.5,
+      "median_revision_lag_days": 367.0,
+      "median_days_period_end_to_first_filing": 51
+    },
+    "by_concept": {
+      "us-gaap:NetIncomeLoss": {
+        "periods": 713,
+        "periods_with_later_filings": 628,
+        "periods_revised": 47,
+        "revised_share_of_periods": 0.06591865357643759,
+        "revised_share_of_refiled_periods": 0.07484076433121019,
+        "issuers_with_a_revision": 19,
+        "median_abs_relative_change": 0.005231388329979879,
+        "p90_abs_relative_change": 0.2020845123561592,
+        "share_of_revisions_above_1pct": 0.3829787234042553,
+        "median_revision_lag_days": 367,
+        "median_days_period_end_to_first_filing": 51
+      },
+      "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax": {
+        "periods": 208,
+        "periods_with_later_filings": 158,
+        "periods_revised": 6,
+        "revised_share_of_periods": 0.028846153846153848,
+        "revised_share_of_refiled_periods": 0.0379746835443038,
+        "issuers_with_a_revision": 2,
+        "median_abs_relative_change": 0.15891253760520774,
+        "p90_abs_relative_change": 0.20440579710144927,
+        "share_of_revisions_above_1pct": 0.8333333333333334,
+        "median_revision_lag_days": 546.5,
+        "median_days_period_end_to_first_filing": 45.0
+      },
+      "us-gaap:Revenues": {
+        "periods": 473,
+        "periods_with_later_filings": 384,
+        "periods_revised": 61,
+        "revised_share_of_periods": 0.12896405919661733,
+        "revised_share_of_refiled_periods": 0.15885416666666666,
+        "issuers_with_a_revision": 16,
+        "median_abs_relative_change": 0.007877357514026044,
+        "p90_abs_relative_change": 0.07566438525095573,
+        "share_of_revisions_above_1pct": 0.4426229508196721,
+        "median_revision_lag_days": 368,
+        "median_days_period_end_to_first_filing": 53
+      },
+      "us-gaap:SalesRevenueNet": {
+        "periods": 167,
+        "periods_with_later_filings": 131,
+        "periods_revised": 22,
+        "revised_share_of_periods": 0.1317365269461078,
+        "revised_share_of_refiled_periods": 0.16793893129770993,
+        "issuers_with_a_revision": 6,
+        "median_abs_relative_change": 0.027275706977600143,
+        "p90_abs_relative_change": 0.15431509590812525,
+        "share_of_revisions_above_1pct": 0.8181818181818182,
+        "median_revision_lag_days": 365.5,
+        "median_days_period_end_to_first_filing": 52
+      }
+    }
+  },
+  "leakage": {
+    "vector": {
+      "accuracy": {
+        "value": 0.18554976516759955,
+        "numerator": 2884,
+        "denominator": 15543,
+        "ci95": [
+          0.127248704274432,
+          0.2522379324614717
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "coverage": {
+        "value": 1.0,
+        "numerator": 15543,
+        "denominator": 15543,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "answer_leakage_rate_all_queries": {
+        "value": 0.7422633983143537,
+        "numerator": 11537,
+        "denominator": 15543,
+        "ci95": [
+          0.6726276264412415,
+          0.8087558626548828
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "answer_leakage_rate_answered": {
+        "value": 0.7422633983143537,
+        "numerator": 11537,
+        "denominator": 15543,
+        "ci95": [
+          0.6726276264412415,
+          0.8087558626548828
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "context_leakage_rate": {
+        "value": 0.9177121533809431,
+        "numerator": 14264,
+        "denominator": 15543,
+        "ci95": [
+          0.9089810942666725,
+          0.929137946671902
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "future_filing_answer_rate_all_queries": {
+        "value": 0.7403332689956894,
+        "numerator": 11507,
+        "denominator": 15543,
+        "ci95": [
+          0.6708413004084883,
+          0.8072250432891621
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "leaked_and_incorrect_rate": {
+        "value": 0.7213536640288233,
+        "numerator": 11212,
+        "denominator": 15543,
+        "ci95": [
+          0.6479806793758585,
+          0.7943122698491241
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "correct_abstention_rate": {
+        "value": null,
+        "numerator": 0,
+        "denominator": 0,
+        "ci95": null,
+        "bootstrap_valid_samples": 0
+      }
+    },
+    "overwrite": {
+      "accuracy": {
+        "value": 0.777134401338223,
+        "numerator": 12079,
+        "denominator": 15543,
+        "ci95": [
+          0.7443981690377511,
+          0.8065158289040041
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "coverage": {
+        "value": 1.0,
+        "numerator": 15543,
+        "denominator": 15543,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "answer_leakage_rate_all_queries": {
+        "value": 0.9172617898732548,
+        "numerator": 14257,
+        "denominator": 15543,
+        "ci95": [
+          0.9054211137589062,
+          0.931153263865188
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "answer_leakage_rate_answered": {
+        "value": 0.9172617898732548,
+        "numerator": 14257,
+        "denominator": 15543,
+        "ci95": [
+          0.9054211137589062,
+          0.931153263865188
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "context_leakage_rate": {
+        "value": 0.9172617898732548,
+        "numerator": 14257,
+        "denominator": 15543,
+        "ci95": [
+          0.9054211137589062,
+          0.931153263865188
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "future_filing_answer_rate_all_queries": {
+        "value": 0.9168114263655665,
+        "numerator": 14250,
+        "denominator": 15543,
+        "ci95": [
+          0.9050602192855767,
+          0.9308216926400859
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "leaked_and_incorrect_rate": {
+        "value": 0.222865598661777,
+        "numerator": 3464,
+        "denominator": 15543,
+        "ci95": [
+          0.19348417109599592,
+          0.25560183096224887
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "correct_abstention_rate": {
+        "value": null,
+        "numerator": 0,
+        "denominator": 0,
+        "ci95": null,
+        "bootstrap_valid_samples": 0
+      }
+    },
+    "period_end": {
+      "accuracy": {
+        "value": 0.777134401338223,
+        "numerator": 12079,
+        "denominator": 15543,
+        "ci95": [
+          0.7443981690377511,
+          0.8065158289040041
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "coverage": {
+        "value": 1.0,
+        "numerator": 15543,
+        "denominator": 15543,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "answer_leakage_rate_all_queries": {
+        "value": 0.9172617898732548,
+        "numerator": 14257,
+        "denominator": 15543,
+        "ci95": [
+          0.9054211137589062,
+          0.931153263865188
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "answer_leakage_rate_answered": {
+        "value": 0.9172617898732548,
+        "numerator": 14257,
+        "denominator": 15543,
+        "ci95": [
+          0.9054211137589062,
+          0.931153263865188
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "context_leakage_rate": {
+        "value": 0.9172617898732548,
+        "numerator": 14257,
+        "denominator": 15543,
+        "ci95": [
+          0.9054211137589062,
+          0.931153263865188
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "future_filing_answer_rate_all_queries": {
+        "value": 0.9168114263655665,
+        "numerator": 14250,
+        "denominator": 15543,
+        "ci95": [
+          0.9050602192855767,
+          0.9308216926400859
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "leaked_and_incorrect_rate": {
+        "value": 0.222865598661777,
+        "numerator": 3464,
+        "denominator": 15543,
+        "ci95": [
+          0.19348417109599592,
+          0.25560183096224887
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "correct_abstention_rate": {
+        "value": null,
+        "numerator": 0,
+        "denominator": 0,
+        "ci95": null,
+        "bootstrap_valid_samples": 0
+      }
+    },
+    "bitemporal": {
+      "accuracy": {
+        "value": 1.0,
+        "numerator": 15543,
+        "denominator": 15543,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "coverage": {
+        "value": 1.0,
+        "numerator": 15543,
+        "denominator": 15543,
+        "ci95": [
+          1.0,
+          1.0
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "answer_leakage_rate_all_queries": {
+        "value": 0.0,
+        "numerator": 0,
+        "denominator": 15543,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "answer_leakage_rate_answered": {
+        "value": 0.0,
+        "numerator": 0,
+        "denominator": 15543,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "context_leakage_rate": {
+        "value": 0.0,
+        "numerator": 0,
+        "denominator": 15543,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "future_filing_answer_rate_all_queries": {
+        "value": 0.0,
+        "numerator": 0,
+        "denominator": 15543,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "leaked_and_incorrect_rate": {
+        "value": 0.0,
+        "numerator": 0,
+        "denominator": 15543,
+        "ci95": [
+          0.0,
+          0.0
+        ],
+        "bootstrap_valid_samples": 500
+      },
+      "correct_abstention_rate": {
+        "value": null,
+        "numerator": 0,
+        "denominator": 0,
+        "ci95": null,
+        "bootstrap_valid_samples": 0
+      }
+    }
+  },
+  "leakage_queries": 15543,
+  "signal_divergence": {
+    "vector": {
+      "signals": 5404,
+      "signals_using_unavailable_facts": 4381,
+      "common_with_bitemporal": 4600,
+      "changed_vs_bitemporal": 3839,
+      "changed_share": 0.8345652173913043,
+      "median_abs_change_when_changed": 0.06080597000068377,
+      "signals_without_bitemporal_counterpart": 804,
+      "bitemporal_signals_missing": 35,
+      "dates_with_rank_correlation": 200,
+      "mean_rank_correlation_with_bitemporal": 0.46087850315207296,
+      "min_rank_correlation_with_bitemporal": -0.5032967032967033
+    },
+    "overwrite": {
+      "signals": 4841,
+      "signals_using_unavailable_facts": 4386,
+      "common_with_bitemporal": 4635,
+      "changed_vs_bitemporal": 1250,
+      "changed_share": 0.2696871628910464,
+      "median_abs_change_when_changed": 0.016332571757394998,
+      "signals_without_bitemporal_counterpart": 206,
+      "bitemporal_signals_missing": 0,
+      "dates_with_rank_correlation": 200,
+      "mean_rank_correlation_with_bitemporal": 0.9055443645060587,
+      "min_rank_correlation_with_bitemporal": -0.12351778656126482
+    },
+    "period_end": {
+      "signals": 4841,
+      "signals_using_unavailable_facts": 4386,
+      "common_with_bitemporal": 4635,
+      "changed_vs_bitemporal": 1250,
+      "changed_share": 0.2696871628910464,
+      "median_abs_change_when_changed": 0.016332571757394998,
+      "signals_without_bitemporal_counterpart": 206,
+      "bitemporal_signals_missing": 0,
+      "dates_with_rank_correlation": 200,
+      "mean_rank_correlation_with_bitemporal": 0.9055443645060587,
+      "min_rank_correlation_with_bitemporal": -0.12351778656126482
+    },
+    "bitemporal": {
+      "signals": 4635,
+      "signals_using_unavailable_facts": 0,
+      "common_with_bitemporal": 4635,
+      "changed_vs_bitemporal": 0,
+      "changed_share": 0.0,
+      "median_abs_change_when_changed": null,
+      "signals_without_bitemporal_counterpart": 0,
+      "bitemporal_signals_missing": 0,
+      "dates_with_rank_correlation": 200,
+      "mean_rank_correlation_with_bitemporal": 1.0,
+      "min_rank_correlation_with_bitemporal": 1.0
+    }
+  },
+  "example_revision": {
+    "cik": "0000051143",
+    "issuer": "IBM",
+    "concept": "us-gaap:Revenues",
+    "unit": "USD",
+    "period_start": "2019-01-01",
+    "period_end": "2019-12-31",
+    "original_filed": "2020-02-25",
+    "first_revision_filed": "2022-02-22",
+    "rows": [
+      {
+        "as_of": "2019-12-01",
+        "vector": 57714000000.0,
+        "overwrite": null,
+        "period_end": null,
+        "bitemporal": null
+      },
+      {
+        "as_of": "2020-01-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": null
+      },
+      {
+        "as_of": "2020-02-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": null
+      },
+      {
+        "as_of": "2020-03-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2020-04-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2020-05-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2020-06-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2020-07-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2020-08-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2020-09-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2020-10-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2020-11-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2020-12-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2021-01-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2021-02-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2021-03-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2021-04-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2021-05-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2021-06-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2021-07-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2021-08-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2021-09-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2021-10-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2021-11-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2021-12-01",
+        "vector": 77147000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2022-01-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2022-02-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 77147000000.0
+      },
+      {
+        "as_of": "2022-03-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2022-04-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2022-05-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2022-06-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2022-07-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2022-08-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2022-09-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2022-10-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2022-11-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2022-12-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2023-01-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2023-02-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2023-03-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2023-04-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2023-05-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2023-06-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2023-07-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2023-08-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2023-09-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2023-10-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2023-11-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      },
+      {
+        "as_of": "2023-12-01",
+        "vector": 57714000000.0,
+        "overwrite": 57714000000.0,
+        "period_end": 57714000000.0,
+        "bitemporal": 57714000000.0
+      }
+    ]
+  },
+  "caveats": [
+    "Convenience universe of today's large issuers; not survivorship-free.",
+    "Companyfacts is a retrospective aggregation, not an archive of historical API snapshots.",
+    "Rates depend on the stated monthly schedule; they are not market-wide prevalence estimates.",
+    "Signal divergence uses no returns and makes no performance claim."
+  ]
+}

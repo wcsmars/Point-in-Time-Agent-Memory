@@ -1,0 +1,400 @@
+{
+  "schema_version": 1,
+  "experiment": "retrieval_only",
+  "dataset": {
+    "facts": 3951,
+    "queries": 15543,
+    "issuers": 40,
+    "query_distribution": "latest-annual question on the first day of every month for every series, 2010-01-01 to 2026-10-01, from the series' first availability date, while the point-in-time answer is at most 550 days past fiscal year end",
+    "concepts": [
+      "us-gaap:Revenues",
+      "us-gaap:RevenueFromContractWithCustomerExcludingAssessedTax",
+      "us-gaap:SalesRevenueNet",
+      "us-gaap:NetIncomeLoss"
+    ]
+  },
+  "bootstrap": {
+    "unit": "issuer",
+    "samples": 500,
+    "seed": 7,
+    "method": "percentile cluster bootstrap; CI unavailable below two issuers"
+  },
+  "index_build_ms": 60.3279578499496,
+  "bitemporal_implementation": "provided_retriever",
+  "backends": {
+    "vector": {
+      "queries": 15543,
+      "issuer_clusters": 40,
+      "metrics": {
+        "accuracy": {
+          "value": 0.18554976516759955,
+          "numerator": 2884,
+          "denominator": 15543,
+          "ci95": [
+            0.127248704274432,
+            0.2522379324614717
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "coverage": {
+          "value": 1.0,
+          "numerator": 15543,
+          "denominator": 15543,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "answer_leakage_rate_all_queries": {
+          "value": 0.7422633983143537,
+          "numerator": 11537,
+          "denominator": 15543,
+          "ci95": [
+            0.6726276264412415,
+            0.8087558626548828
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "answer_leakage_rate_answered": {
+          "value": 0.7422633983143537,
+          "numerator": 11537,
+          "denominator": 15543,
+          "ci95": [
+            0.6726276264412415,
+            0.8087558626548828
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "context_leakage_rate": {
+          "value": 0.9177121533809431,
+          "numerator": 14264,
+          "denominator": 15543,
+          "ci95": [
+            0.9089810942666725,
+            0.929137946671902
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "future_filing_answer_rate_all_queries": {
+          "value": 0.7403332689956894,
+          "numerator": 11507,
+          "denominator": 15543,
+          "ci95": [
+            0.6708413004084883,
+            0.8072250432891621
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "leaked_and_incorrect_rate": {
+          "value": 0.7213536640288233,
+          "numerator": 11212,
+          "denominator": 15543,
+          "ci95": [
+            0.6479806793758585,
+            0.7943122698491241
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "correct_abstention_rate": {
+          "value": null,
+          "numerator": 0,
+          "denominator": 0,
+          "ci95": null,
+          "bootstrap_valid_samples": 0
+        }
+      },
+      "latency_ms": {
+        "mean": 0.048914046479095585,
+        "p95": 0.06333398632705212
+      },
+      "cost": {
+        "llm_calls": 0,
+        "embedding_api_calls": 0,
+        "api_usd": 0.0,
+        "note": "Local retrieval only; machine and data costs are not estimated."
+      }
+    },
+    "overwrite": {
+      "queries": 15543,
+      "issuer_clusters": 40,
+      "metrics": {
+        "accuracy": {
+          "value": 0.777134401338223,
+          "numerator": 12079,
+          "denominator": 15543,
+          "ci95": [
+            0.7443981690377511,
+            0.8065158289040041
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "coverage": {
+          "value": 1.0,
+          "numerator": 15543,
+          "denominator": 15543,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "answer_leakage_rate_all_queries": {
+          "value": 0.9172617898732548,
+          "numerator": 14257,
+          "denominator": 15543,
+          "ci95": [
+            0.9054211137589062,
+            0.931153263865188
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "answer_leakage_rate_answered": {
+          "value": 0.9172617898732548,
+          "numerator": 14257,
+          "denominator": 15543,
+          "ci95": [
+            0.9054211137589062,
+            0.931153263865188
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "context_leakage_rate": {
+          "value": 0.9172617898732548,
+          "numerator": 14257,
+          "denominator": 15543,
+          "ci95": [
+            0.9054211137589062,
+            0.931153263865188
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "future_filing_answer_rate_all_queries": {
+          "value": 0.9168114263655665,
+          "numerator": 14250,
+          "denominator": 15543,
+          "ci95": [
+            0.9050602192855767,
+            0.9308216926400859
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "leaked_and_incorrect_rate": {
+          "value": 0.222865598661777,
+          "numerator": 3464,
+          "denominator": 15543,
+          "ci95": [
+            0.19348417109599592,
+            0.25560183096224887
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "correct_abstention_rate": {
+          "value": null,
+          "numerator": 0,
+          "denominator": 0,
+          "ci95": null,
+          "bootstrap_valid_samples": 0
+        }
+      },
+      "latency_ms": {
+        "mean": 0.0041866836980592095,
+        "p95": 0.006500165909528732
+      },
+      "cost": {
+        "llm_calls": 0,
+        "embedding_api_calls": 0,
+        "api_usd": 0.0,
+        "note": "Local retrieval only; machine and data costs are not estimated."
+      }
+    },
+    "period_end": {
+      "queries": 15543,
+      "issuer_clusters": 40,
+      "metrics": {
+        "accuracy": {
+          "value": 0.777134401338223,
+          "numerator": 12079,
+          "denominator": 15543,
+          "ci95": [
+            0.7443981690377511,
+            0.8065158289040041
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "coverage": {
+          "value": 1.0,
+          "numerator": 15543,
+          "denominator": 15543,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "answer_leakage_rate_all_queries": {
+          "value": 0.9172617898732548,
+          "numerator": 14257,
+          "denominator": 15543,
+          "ci95": [
+            0.9054211137589062,
+            0.931153263865188
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "answer_leakage_rate_answered": {
+          "value": 0.9172617898732548,
+          "numerator": 14257,
+          "denominator": 15543,
+          "ci95": [
+            0.9054211137589062,
+            0.931153263865188
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "context_leakage_rate": {
+          "value": 0.9172617898732548,
+          "numerator": 14257,
+          "denominator": 15543,
+          "ci95": [
+            0.9054211137589062,
+            0.931153263865188
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "future_filing_answer_rate_all_queries": {
+          "value": 0.9168114263655665,
+          "numerator": 14250,
+          "denominator": 15543,
+          "ci95": [
+            0.9050602192855767,
+            0.9308216926400859
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "leaked_and_incorrect_rate": {
+          "value": 0.222865598661777,
+          "numerator": 3464,
+          "denominator": 15543,
+          "ci95": [
+            0.19348417109599592,
+            0.25560183096224887
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "correct_abstention_rate": {
+          "value": null,
+          "numerator": 0,
+          "denominator": 0,
+          "ci95": null,
+          "bootstrap_valid_samples": 0
+        }
+      },
+      "latency_ms": {
+        "mean": 0.013240153074335471,
+        "p95": 0.01078671775758265
+      },
+      "cost": {
+        "llm_calls": 0,
+        "embedding_api_calls": 0,
+        "api_usd": 0.0,
+        "note": "Local retrieval only; machine and data costs are not estimated."
+      }
+    },
+    "bitemporal": {
+      "queries": 15543,
+      "issuer_clusters": 40,
+      "metrics": {
+        "accuracy": {
+          "value": 1.0,
+          "numerator": 15543,
+          "denominator": 15543,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "coverage": {
+          "value": 1.0,
+          "numerator": 15543,
+          "denominator": 15543,
+          "ci95": [
+            1.0,
+            1.0
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "answer_leakage_rate_all_queries": {
+          "value": 0.0,
+          "numerator": 0,
+          "denominator": 15543,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "answer_leakage_rate_answered": {
+          "value": 0.0,
+          "numerator": 0,
+          "denominator": 15543,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "context_leakage_rate": {
+          "value": 0.0,
+          "numerator": 0,
+          "denominator": 15543,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "future_filing_answer_rate_all_queries": {
+          "value": 0.0,
+          "numerator": 0,
+          "denominator": 15543,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "leaked_and_incorrect_rate": {
+          "value": 0.0,
+          "numerator": 0,
+          "denominator": 15543,
+          "ci95": [
+            0.0,
+            0.0
+          ],
+          "bootstrap_valid_samples": 500
+        },
+        "correct_abstention_rate": {
+          "value": null,
+          "numerator": 0,
+          "denominator": 0,
+          "ci95": null,
+          "bootstrap_valid_samples": 0
+        }
+      },
+      "latency_ms": {
+        "mean": 0.8700276033647605,
+        "p95": 1.0094876401126385
+      },
+      "cost": {
+        "llm_calls": 0,
+        "embedding_api_calls": 0,
+        "api_usd": 0.0,
+        "note": "Local retrieval only; machine and data costs are not estimated."
+      }
+    }
+  },
+  "attribution": "Future facts in logged context prove retrieval exposure. This experiment runs no LLM and makes no claim about model-training leakage.",
+  "storage_mode": "duckdb"
+}

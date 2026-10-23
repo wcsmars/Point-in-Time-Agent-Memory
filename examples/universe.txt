@@ -1,0 +1,45 @@
+# Convenience universe for the real-data leakage audit.
+# Selection date: 2026-10-23. Rule: 40 large US-listed issuers hand-picked across
+# sectors that file 10-K reports with SEC XBRL companyfacts. These are today's
+# surviving large firms, so this is NOT a survivorship-free historical universe.
+# One numeric CIK per line; text after # is a comment.
+320193   # Apple
+789019   # Microsoft
+1018724  # Amazon
+1652044  # Alphabet
+1326801  # Meta Platforms
+1045810  # NVIDIA
+50863    # Intel
+858877   # Cisco Systems
+1341439  # Oracle
+51143    # IBM
+804328   # Qualcomm
+97476    # Texas Instruments
+796343   # Adobe
+1108524  # Salesforce
+1065280  # Netflix
+19617    # JPMorgan Chase
+70858    # Bank of America
+831001   # Citigroup
+72971    # Wells Fargo
+886982   # Goldman Sachs
+1403161  # Visa
+1141391  # Mastercard
+200406   # Johnson & Johnson
+78003    # Pfizer
+310158   # Merck
+1800     # Abbott Laboratories
+318154   # Amgen
+731766   # UnitedHealth Group
+34088    # Exxon Mobil
+93410    # Chevron
+104169   # Walmart
+909832   # Costco
+354950   # Home Depot
+80424    # Procter & Gamble
+21344    # Coca-Cola
+77476    # PepsiCo
+63908    # McDonald's
+320187   # Nike
+12927    # Boeing
+18230    # Caterpillar

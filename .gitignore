@@ -1,0 +1,47 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+config.yaml
+config.yml
+credentials/
+credentials.json
+secrets.*
+private/
+*.key
+*.pem
+
+# SEC downloads, databases and full run outputs (regenerate locally)
+data/
+data/raw/
+runs/
+*.duckdb
+*.duckdb.wal
+
+# Document and presentation files
+paper/
+papers/
+manuscript/
+slides/
+*.tex
+*.bib
+*.docx
+*.pdf
+*.ppt
+*.pptx
+
+# Python and editor artifacts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+.idea/
+.vscode/
+*.log
