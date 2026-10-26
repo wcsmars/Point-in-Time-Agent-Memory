@@ -62,11 +62,19 @@ class BackendIndex:
     """Build frozen snapshots once so overwritten rows cannot be recovered."""
 
     def __init__(self, facts: Iterable[Fact]):
-        self.facts = tuple(facts)
+        # One row per fact_id, like the DuckDB primary key: a repeated input row
+        # (for example two concatenated exports) must not fill context twice.
+        unique: dict[str, Fact] = {}
+        for fact in facts:
+            unique.setdefault(fact.fact_id, fact)
+        self.facts = tuple(unique.values())
         self.vectors = {fact.fact_id: _vector(_document(fact)) for fact in self.facts}
         snapshot: dict[tuple, list[Fact]] = {}
         for fact in self.facts:
-            key = (fact.cik, fact.concept, fact.unit, fact.period_start, fact.period_end)
+            # One snapshot per fiscal year (a period end), as in revision_profile:
+            # a later filing that dates the year's start a day differently still
+            # replaces the original. Same-day rows are kept, so conflicts stay ambiguous.
+            key = (fact.cik, fact.concept, fact.unit, fact.period_end)
             rows = snapshot.get(key, [])
             if not rows or fact.filed > rows[0].filed:
                 snapshot[key] = [fact]
@@ -83,8 +91,8 @@ class BackendIndex:
     def retrieve(self, query: Query, backend: str, top_k: int = 5) -> Retrieval:
         if backend not in BACKENDS:
             raise ValueError(f"backend must be one of {BACKENDS}")
-        if top_k < 1:
-            raise ValueError("top_k must be positive")
+        if isinstance(top_k, bool) or not isinstance(top_k, int) or top_k < 1:
+            raise ValueError("top_k must be a positive integer")
         groups = self.scoped_overwritten if backend == "overwrite" else self.scoped_facts
         source = groups.get((query.cik, query.concept, query.unit), ())
         candidates = [fact for fact in source

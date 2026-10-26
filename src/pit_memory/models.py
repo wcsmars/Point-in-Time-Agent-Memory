@@ -6,6 +6,7 @@ from datetime import date
 import hashlib
 import json
 import math
+import re
 from typing import Literal
 
 
@@ -17,7 +18,7 @@ def iso_date(value: str) -> str:
 
 def normalize_cik(value: str | int) -> str:
     raw = str(value)
-    if not raw.isascii() or not raw.isdigit() or not 0 < int(raw) < 10**10:
+    if not isinstance(value, (str, int)) or not 1 <= len(raw) <= 10 or not raw.isascii() or not raw.isdigit() or int(raw) == 0:
         raise ValueError("CIK must be a positive integer of at most ten digits")
     return str(int(raw)).zfill(10)
 
@@ -44,12 +45,22 @@ class Fact:
             iso_date(getattr(self, key))
         if not self.period_start <= self.period_end <= self.filed < self.available_on:
             raise ValueError("Expected period_start <= period_end <= filed < available_on")
-        if isinstance(self.value, bool) or not isinstance(self.value, (int, float)) or not math.isfinite(self.value):
+        if isinstance(self.value, bool) or not isinstance(self.value, (int, float)):
             raise ValueError("Fact value must be a finite number")
-        object.__setattr__(self, "value", float(self.value))
+        try:
+            value = float(self.value)
+        except OverflowError as exc:
+            raise ValueError("Fact value must be a finite number") from exc
+        if not math.isfinite(value):
+            raise ValueError("Fact value must be a finite number")
+        object.__setattr__(self, "value", value)
         for key in ("concept", "unit", "accession", "form"):
             if not isinstance(getattr(self, key), str) or not getattr(self, key).strip():
                 raise ValueError(f"Missing fact field {key}")
+        if not isinstance(self.source_url, str):
+            raise ValueError("source_url must be a string")
+        if not isinstance(self.source_sha256, str) or (self.source_sha256 and not re.fullmatch(r"[0-9a-f]{64}", self.source_sha256)):
+            raise ValueError("source_sha256 must be empty or a lowercase SHA-256 hex digest")
         # Source snapshot hashes belong in provenance rather than identity: an
         # unchanged fact in a later downloaded companyfacts file is not a new fact.
         identity = {k: v for k, v in asdict(self).items() if k not in {"fact_id", "source_url", "source_sha256"}}

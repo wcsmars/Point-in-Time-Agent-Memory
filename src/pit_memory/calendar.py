@@ -9,13 +9,16 @@ import warnings
 from .models import iso_date
 
 
-@lru_cache(maxsize=8)
-def _calendar(year: int):
+@lru_cache(maxsize=1)
+def _calendar():
     import exchange_calendars as xcals
 
-    # Explicit range avoids dependency defaults tied to today's date.
+    # One calendar for the whole supported range builds about as fast as a
+    # few-year window. Per-year windows in a small cache were rebuilt for
+    # almost every filing date, because filings arrive out of year order.
+    # The explicit range avoids dependency defaults tied to today's date.
     with _quiet_dependency():
-        return xcals.get_calendar("XNYS", start=f"{year-1}-01-01", end=f"{year+2}-12-31")
+        return xcals.get_calendar("XNYS", start="1999-01-01", end="2101-12-31")
 
 
 @contextmanager
@@ -38,7 +41,7 @@ def next_trading_session(filed: str) -> str:
     day = date.fromisoformat(filed)
     if not 2000 <= day.year <= 2100:
         raise ValueError("Filing date outside supported calendar years 2000-2100")
-    cal = _calendar(day.year)
+    cal = _calendar()
     with _quiet_dependency():
         result = cal.date_to_session(day + timedelta(days=1), direction="next")
     return result.date().isoformat()

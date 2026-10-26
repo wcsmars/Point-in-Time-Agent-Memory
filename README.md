@@ -28,15 +28,15 @@ month from its first filing through October 2026. A month is skipped when the
 point-in-time answer's fiscal year ended more than 550 days earlier, which
 removes tags an issuer has stopped using: **15,543 questions** per backend. In
 this audit the point-in-time answers are served by DuckDB SQL. Intervals are
-95% bootstrap intervals that resample issuers.
+95% bootstrap intervals that resample issuers (10,000 draws).
 
 ![Leakage by backend on SEC filings](figures/sec_leakage_by_backend.png)
 
 | Backend | Correct | Answer not yet available | Unavailable **and** wrong | Future fact in context |
 | --- | --- | --- | --- | --- |
-| Vector, no date filter | 18.6% [12.7, 25.2] | 74.2% [67.3, 80.9] | 72.1% [64.8, 79.4] | 91.8% |
-| Overwrite (latest value only) | 77.7% [74.4, 80.7] | 91.7% [90.5, 93.1] | 22.3% [19.3, 25.6] | 91.7% |
-| Filter on fiscal period end only | 77.7% [74.4, 80.7] | 91.7% [90.5, 93.1] | 22.3% [19.3, 25.6] | 91.7% |
+| Vector, no date filter | 18.6% [12.4, 25.6] | 74.2% [66.4, 81.5] | 72.1% [64.1, 79.8] | 91.8% |
+| Overwrite (latest value only) | 77.7% [74.6, 80.6] | 91.7% [90.4, 92.9] | 22.3% [19.4, 25.4] | 91.7% |
+| Filter on fiscal period end only | 77.7% [74.6, 80.6] | 91.7% [90.4, 92.9] | 22.3% [19.4, 25.4] | 91.7% |
 | Bitemporal (this project) | 100% * | 0% | 0% | 0% |
 
 \* Correct by construction: the expected answers come from an independent
@@ -63,18 +63,22 @@ contained (`leaked_answer_breakdown` in
   usually comes from a report that did not exist on the question date. The
   number is right; the citation is from the future, and an audit trail built
   on it fails.
-- **2,243 described a fiscal year whose 10-K had not been filed.** Between a
-  fiscal year end and its filing (median 51 days here), a period-end filter
-  serves the new year's numbers early.
+- **2,243 described a newer fiscal year that was not yet available.** Between
+  a fiscal year end and its filing (median 51 days here), a period-end filter
+  serves the new year's numbers early. For 2,177 of them the 10-K had not been
+  filed; the other 66 were filed on the question date or were still waiting
+  for the next trading session.
 - **1,221 were later restated values** for the right year.
 
 ### How often SEC values change after first publication
 
 ![Distribution of revision sizes](figures/sec_revision_sizes.png)
 
-Of 1,552 annual periods, 1,302 appear again in a later filing and **136 (8.8%)
-were later reported with a different value**, at 24 of the 40 issuers. Half of
-the changes exceed 1% of the original value; the 90th percentile is 16%. The
+Of 1,552 annual periods, 1,302 appear again in a later filing and **137 (8.8%)
+were later reported with a different value**, at 24 of the 40 issuers. About
+half of the changes (68) exceed 1% of the original value; the 90th percentile
+is 16%. The smallest are rounding, when a later 10-K reports the same year in
+millions instead of thousands. The
 median time from the original 10-K to the first different value is 367 days,
 which is the next annual report. By date and size, the largest changes
 coincide with publicly known events: recasts after separations (Abbott after
@@ -103,10 +107,14 @@ implementation of every backend, which the tests check against the SQL.
 
 ![Rank correlation of revenue-growth signal with the point-in-time signal](figures/sec_signal_rank_correlation.png)
 
-| Backend | Signals changed vs point in time | Signals that should not exist yet | Mean (min) per-date rank correlation |
+| Backend | Signals changed vs point in time | Signals without a point-in-time counterpart | Mean (min) per-date rank correlation |
 | --- | --- | --- | --- |
 | Vector | 83.5% of 4,600 | 804 | 0.46 (-0.50) |
 | Overwrite / period end | 27.0% of 4,635 | 206 | 0.91 (-0.12) |
+
+Missing counterparts mean the point-in-time backend could not compute a signal
+for that issuer and date. All such signals in this study used unavailable facts;
+the report also records unavailable-fact use separately.
 
 More than a quarter of the latest-value growth signals differ from what was
 knowable. On six of the January and February dates (when most fiscal years
@@ -166,7 +174,7 @@ QUALIFY dense_rank() OVER (ORDER BY period_end DESC, filed DESC) = 1
 | Backend | Representation | Deliberate weakness |
 | --- | --- | --- |
 | `vector` | 512-dimension signed feature-hash vectors, cosine top 5 | No date filter at all |
-| `overwrite` | One newest-filing snapshot per period, built once | History is gone; fiscal end is the only date filter |
+| `overwrite` | One newest-filing snapshot per fiscal year, built once | History is gone; fiscal end is the only date filter |
 | `period_end` | All versions, filtered by fiscal period end | Treats period end as publication |
 | `bitemporal` | All versions, filtered by availability first | Reference implementation |
 
@@ -207,8 +215,9 @@ python -m pytest
 ```
 
 Offline, no downloads. The bundled sample holds 834 real SEC facts for eight
-issuers chosen because their filings contain restatements, so its rates are
-higher than the 40-issuer results above.
+issuers chosen because their filings contain restatements, so its revision
+rate (18% of periods) and the latest-value stores' wrong-answer rates are
+higher than in the 40-issuer results above.
 
 ```bash
 pit-memory demo --output runs/demo                  # synthetic benchmark + factor check
@@ -222,8 +231,9 @@ pit-memory plot --study runs/sample-study --demo runs/demo --output runs/figures
 `./run-demo.sh` runs the synthetic demo straight from the source tree, without
 installing anything.
 
-Full study from SEC (about 20 minutes for 40 issuers at SEC's rate limit). SEC
-requires a descriptive User-Agent with a real contact address:
+Full study from SEC (about two minutes to download and import 40 issuers; the
+client stays below SEC's request-rate limit and asks for compressed responses).
+SEC requires a descriptive User-Agent with a real contact address:
 
 ```bash
 export SEC_USER_AGENT='YourProjectName your-real-contact@example.org'
@@ -233,7 +243,8 @@ pit-memory study --db data/sec.duckdb --universe examples/universe.txt \
 pit-memory plot --study runs/sec-study --output figures
 ```
 
-Other commands: `evaluate` (boundary-enriched audit around every filing date),
+Other commands: `evaluate` (boundary-enriched audit around every filing date;
+pass `--concept`),
 `factor` (rank IC against a returns CSV you supply), `import-sec` (downloaded
 companyfacts files), `export-facts`. Add `--backend overwrite` (or `vector`,
 `period_end`) to `query` to see what a leaky store would have said.
@@ -243,7 +254,10 @@ companyfacts files), `export-facts`. Add `--backend overwrite` (or `vector`,
 
 `pit_memory.agent_tool` defines the lookup as a JSON Schema tool (name,
 description, parameters) for a function-calling LLM, and a handler that turns
-the model's arguments into a cited answer or an explicit abstention. The agent
+the model's arguments into a cited answer or an explicit abstention. APIs
+wrap tool definitions differently, so `input_schema_tool()`, `function_tool()`
+and `flat_function_tool()` return the same definition in the three common
+layouts. The agent
 passes its simulated knowledge date as `as_of`; the tool cannot return anything
 published later.
 
@@ -251,8 +265,10 @@ published later.
 from pit_memory import DuckDBStore
 from pit_memory.agent_tool import TOOL_SPEC, call_tool
 
-# Register TOOL_SPEC with the agent; when the model calls it, run:
-with DuckDBStore("data/sample.duckdb") as store:
+# Register TOOL_SPEC (or one of the layouts above) with the agent; when the
+# model calls it, run (read-only: a missing database is an error, and several
+# agent processes can share the file):
+with DuckDBStore("data/sample.duckdb", read_only=True) as store:
     result = call_tool({"cik": "51143", "concept": "us-gaap:Revenues",
                         "as_of": "2021-03-15", "period_end": "2019-12-31"}, store.retrieve)
 print(result["status"], result["fact"]["value"], result["fact"]["accession"])
@@ -265,7 +281,8 @@ The result carries the status (`known`, `not_known`, `ambiguous`), the value
 with its fiscal period, form, accession, filing and availability dates and a
 link to the filing, or every conflicting candidate when the answer is
 ambiguous. Malformed arguments return `{"status": "error", ...}` so the model
-can correct its call.
+can correct its call. The handler also rejects evidence outside the requested
+issuer, concept, unit, period or cutoff, even if an incompatible retriever is supplied.
 
 ## Repository layout
 
@@ -283,7 +300,7 @@ src/pit_memory/
   plots.py        figures in this README
   demo.py         labelled synthetic fixture
   cli.py          pit-memory command line
-tests/            90 tests: hand-checked dates, holidays, restatements, SQL, CLI, cross-checks
+tests/            295 tests: dates, holidays, restatements, SQL, CLI, cross-checks
 docs/             architecture and full evaluation specification
 examples/         universe, SEC sample data, study outputs
 figures/          charts above
@@ -295,14 +312,23 @@ Methodology details, metric definitions and the factor protocol are in
 
 ## Validation
 
-- 90 tests, including real exchange-calendar sessions (Good Friday, Hurricane
-  Sandy closures), DuckDB transactions and idempotent re-imports, ambiguity on
-  same-day conflicts, rank ties, matched-cohort IC pairing, SEC retries,
-  dropped connections and damaged caches (mocked network), and the bundled
-  real SEC sample.
-- A randomized cross-check (`tests/test_crosscheck.py`) runs 6,000 queries on
-  the SEC sample and on a stress corpus of restatements, same-day conflicts and
-  shifted fiscal-year starts. DuckDB SQL, the in-memory backend and a second
+- 295 tests include real exchange-calendar sessions (Good Friday, Hurricane
+  Sandy and national days of mourning, year boundaries), DuckDB transactions
+  and idempotent re-imports, ambiguity on same-day conflicts, rank ties,
+  matched-cohort IC pairing, issuer-cluster bootstrap intervals, SEC retries,
+  rate limiting, compressed and dropped connections and damaged caches (mocked
+  network), the bundled real SEC sample, strict agent-tool argument and
+  evidence checks, and output paths that cannot overwrite their own inputs or
+  database.
+- The tests were themselves tested: 170 single-line mutations of the core
+  logic (date filters, ranking, ambiguity, scoring, bootstrap, revision and
+  signal bookkeeping, ingestion scope) were planted one at a time. The suite
+  catches 147 of the 156 that still apply to the code. Eight of the other nine
+  cannot change behavior (for example, removing a date check that the fact
+  model already guarantees); one changes only a per-row trace field.
+- A randomized cross-check (`tests/test_crosscheck.py`) runs 9,000 queries on
+  the SEC sample and on stress corpora of restatements, same-day conflicts,
+  shifted fiscal-year starts, repeated rows and signed zeros. DuckDB SQL, the in-memory backend and a second
   in-memory implementation must agree with a brute-force reading of the rule on
   every query.
 - For this release the full 40-issuer database was also re-derived from the raw
@@ -310,7 +336,9 @@ Methodology details, metric definitions and the factor protocol are in
   filing date's availability session was recomputed, and the headline numbers
   above were recomputed from scratch.
 - CI runs the tests on Python 3.11 to 3.13, the synthetic demo, the study on the
-  SEC sample, and the plots.
+  SEC sample, and the plots. It also builds a wheel, installs it in a separate
+  environment and, from outside the source tree, runs the demo and answers the
+  IBM question above from the imported sample.
 
 ## Limitations
 

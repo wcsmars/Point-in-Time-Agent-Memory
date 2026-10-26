@@ -111,19 +111,20 @@
   ],
   "storage_mode": "duckdb",
   "revisions": {
-    "tolerance": 1e-06,
+    "tolerance": 1e-12,
     "conflicting_original_periods_excluded": 0,
+    "conflicting_later_periods_excluded": 0,
     "overall": {
       "periods": 1552,
       "periods_with_later_filings": 1302,
-      "periods_revised": 136,
-      "revised_share_of_periods": 0.08762886597938144,
-      "revised_share_of_refiled_periods": 0.10445468509984639,
+      "periods_revised": 137,
+      "revised_share_of_periods": 0.08827319587628867,
+      "revised_share_of_refiled_periods": 0.10522273425499232,
       "issuers_with_a_revision": 24,
-      "median_abs_relative_change": 0.010070680085639033,
-      "p90_abs_relative_change": 0.16033057851239668,
-      "share_of_revisions_above_1pct": 0.5,
-      "median_revision_lag_days": 367.0,
+      "median_abs_relative_change": 0.009627939069051537,
+      "p90_abs_relative_change": 0.16211636589479927,
+      "share_of_revisions_above_1pct": 0.49635036496350365,
+      "median_revision_lag_days": 367,
       "median_days_period_end_to_first_filing": 51.0
     },
     "by_concept": {
@@ -135,7 +136,7 @@
         "revised_share_of_refiled_periods": 0.07472178060413355,
         "issuers_with_a_revision": 19,
         "median_abs_relative_change": 0.005231388329979879,
-        "p90_abs_relative_change": 0.2020845123561592,
+        "p90_abs_relative_change": 0.21033274098912114,
         "share_of_revisions_above_1pct": 0.3829787234042553,
         "median_revision_lag_days": 367,
         "median_days_period_end_to_first_filing": 51.0
@@ -148,7 +149,7 @@
         "revised_share_of_refiled_periods": 0.0379746835443038,
         "issuers_with_a_revision": 2,
         "median_abs_relative_change": 0.15891253760520774,
-        "p90_abs_relative_change": 0.20440579710144927,
+        "p90_abs_relative_change": 0.22170631905886115,
         "share_of_revisions_above_1pct": 0.8333333333333334,
         "median_revision_lag_days": 546.5,
         "median_days_period_end_to_first_filing": 45.0
@@ -156,14 +157,14 @@
       "us-gaap:Revenues": {
         "periods": 469,
         "periods_with_later_filings": 384,
-        "periods_revised": 61,
-        "revised_share_of_periods": 0.1300639658848614,
-        "revised_share_of_refiled_periods": 0.15885416666666666,
+        "periods_revised": 62,
+        "revised_share_of_periods": 0.13219616204690832,
+        "revised_share_of_refiled_periods": 0.16145833333333334,
         "issuers_with_a_revision": 16,
-        "median_abs_relative_change": 0.007877357514026044,
-        "p90_abs_relative_change": 0.07566438525095573,
-        "share_of_revisions_above_1pct": 0.4426229508196721,
-        "median_revision_lag_days": 368,
+        "median_abs_relative_change": 0.007220544441439953,
+        "p90_abs_relative_change": 0.07234622986358441,
+        "share_of_revisions_above_1pct": 0.43548387096774194,
+        "median_revision_lag_days": 368.5,
         "median_days_period_end_to_first_filing": 53
       },
       "us-gaap:SalesRevenueNet": {
@@ -174,7 +175,7 @@
         "revised_share_of_refiled_periods": 0.16793893129770993,
         "issuers_with_a_revision": 6,
         "median_abs_relative_change": 0.027275706977600143,
-        "p90_abs_relative_change": 0.15431509590812525,
+        "p90_abs_relative_change": 0.17229167873442042,
         "share_of_revisions_above_1pct": 0.8181818181818182,
         "median_revision_lag_days": 365.5,
         "median_days_period_end_to_first_filing": 52
@@ -188,10 +189,10 @@
         "numerator": 2884,
         "denominator": 15543,
         "ci95": [
-          0.127248704274432,
-          0.2522379324614717
+          0.12396199164312668,
+          0.25583916207005253
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "coverage": {
         "value": 1.0,
@@ -201,57 +202,57 @@
           1.0,
           1.0
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "answer_leakage_rate_all_queries": {
         "value": 0.7422633983143537,
         "numerator": 11537,
         "denominator": 15543,
         "ci95": [
-          0.6726276264412415,
-          0.8087558626548828
+          0.6644893400074149,
+          0.8152332299654358
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "answer_leakage_rate_answered": {
         "value": 0.7422633983143537,
         "numerator": 11537,
         "denominator": 15543,
         "ci95": [
-          0.6726276264412415,
-          0.8087558626548828
+          0.6644893400074149,
+          0.8152332299654358
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "context_leakage_rate": {
         "value": 0.9177121533809431,
         "numerator": 14264,
         "denominator": 15543,
         "ci95": [
-          0.9089810942666725,
-          0.929137946671902
+          0.9073436956615766,
+          0.927434682758948
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "future_filing_answer_rate_all_queries": {
         "value": 0.7403332689956894,
         "numerator": 11507,
         "denominator": 15543,
         "ci95": [
-          0.6708413004084883,
-          0.8072250432891621
+          0.66176995860111,
+          0.8136979119746913
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "leaked_and_incorrect_rate": {
         "value": 0.7213536640288233,
         "numerator": 11212,
         "denominator": 15543,
         "ci95": [
-          0.6479806793758585,
-          0.7943122698491241
+          0.6413757034688705,
+          0.797569490053808
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "correct_abstention_rate": {
         "value": null,
@@ -267,10 +268,10 @@
         "numerator": 12079,
         "denominator": 15543,
         "ci95": [
-          0.7443981690377511,
-          0.8065158289040041
+          0.7458910676825014,
+          0.8062014901268508
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "coverage": {
         "value": 1.0,
@@ -280,57 +281,57 @@
           1.0,
           1.0
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "answer_leakage_rate_all_queries": {
         "value": 0.9172617898732548,
         "numerator": 14257,
         "denominator": 15543,
         "ci95": [
-          0.9054211137589062,
-          0.931153263865188
+          0.9040706253676309,
+          0.9289451987315887
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "answer_leakage_rate_answered": {
         "value": 0.9172617898732548,
         "numerator": 14257,
         "denominator": 15543,
         "ci95": [
-          0.9054211137589062,
-          0.931153263865188
+          0.9040706253676309,
+          0.9289451987315887
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "context_leakage_rate": {
         "value": 0.9172617898732548,
         "numerator": 14257,
         "denominator": 15543,
         "ci95": [
-          0.9054211137589062,
-          0.931153263865188
+          0.9040706253676309,
+          0.9289451987315887
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "future_filing_answer_rate_all_queries": {
         "value": 0.9168114263655665,
         "numerator": 14250,
         "denominator": 15543,
         "ci95": [
-          0.9050602192855767,
-          0.9308216926400859
+          0.903532647271584,
+          0.9285988202680344
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "leaked_and_incorrect_rate": {
         "value": 0.222865598661777,
         "numerator": 3464,
         "denominator": 15543,
         "ci95": [
-          0.19348417109599592,
-          0.25560183096224887
+          0.1937985098731491,
+          0.25410893231749865
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "correct_abstention_rate": {
         "value": null,
@@ -346,10 +347,10 @@
         "numerator": 12079,
         "denominator": 15543,
         "ci95": [
-          0.7443981690377511,
-          0.8065158289040041
+          0.7458910676825014,
+          0.8062014901268508
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "coverage": {
         "value": 1.0,
@@ -359,57 +360,57 @@
           1.0,
           1.0
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "answer_leakage_rate_all_queries": {
         "value": 0.9172617898732548,
         "numerator": 14257,
         "denominator": 15543,
         "ci95": [
-          0.9054211137589062,
-          0.931153263865188
+          0.9040706253676309,
+          0.9289451987315887
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "answer_leakage_rate_answered": {
         "value": 0.9172617898732548,
         "numerator": 14257,
         "denominator": 15543,
         "ci95": [
-          0.9054211137589062,
-          0.931153263865188
+          0.9040706253676309,
+          0.9289451987315887
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "context_leakage_rate": {
         "value": 0.9172617898732548,
         "numerator": 14257,
         "denominator": 15543,
         "ci95": [
-          0.9054211137589062,
-          0.931153263865188
+          0.9040706253676309,
+          0.9289451987315887
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "future_filing_answer_rate_all_queries": {
         "value": 0.9168114263655665,
         "numerator": 14250,
         "denominator": 15543,
         "ci95": [
-          0.9050602192855767,
-          0.9308216926400859
+          0.903532647271584,
+          0.9285988202680344
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "leaked_and_incorrect_rate": {
         "value": 0.222865598661777,
         "numerator": 3464,
         "denominator": 15543,
         "ci95": [
-          0.19348417109599592,
-          0.25560183096224887
+          0.1937985098731491,
+          0.25410893231749865
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "correct_abstention_rate": {
         "value": null,
@@ -428,7 +429,7 @@
           1.0,
           1.0
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "coverage": {
         "value": 1.0,
@@ -438,7 +439,7 @@
           1.0,
           1.0
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "answer_leakage_rate_all_queries": {
         "value": 0.0,
@@ -448,7 +449,7 @@
           0.0,
           0.0
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "answer_leakage_rate_answered": {
         "value": 0.0,
@@ -458,7 +459,7 @@
           0.0,
           0.0
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "context_leakage_rate": {
         "value": 0.0,
@@ -468,7 +469,7 @@
           0.0,
           0.0
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "future_filing_answer_rate_all_queries": {
         "value": 0.0,
@@ -478,7 +479,7 @@
           0.0,
           0.0
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "leaked_and_incorrect_rate": {
         "value": 0.0,
@@ -488,7 +489,7 @@
           0.0,
           0.0
         ],
-        "bootstrap_valid_samples": 500
+        "bootstrap_valid_samples": 10000
       },
       "correct_abstention_rate": {
         "value": null,
@@ -504,7 +505,8 @@
     "vector": {
       "leaked_answers": 11537,
       "right_value_later_filing": 322,
-      "right_value_same_day_filing": 3,
+      "right_value_same_day_filing": 1,
+      "right_value_before_availability": 2,
       "different_fiscal_period": 11204,
       "restated_value_same_period": 8,
       "other": 0
@@ -513,6 +515,7 @@
       "leaked_answers": 14257,
       "right_value_later_filing": 10793,
       "right_value_same_day_filing": 0,
+      "right_value_before_availability": 0,
       "different_fiscal_period": 2243,
       "restated_value_same_period": 1221,
       "other": 0
@@ -521,6 +524,7 @@
       "leaked_answers": 14257,
       "right_value_later_filing": 10793,
       "right_value_same_day_filing": 0,
+      "right_value_before_availability": 0,
       "different_fiscal_period": 2243,
       "restated_value_same_period": 1221,
       "other": 0
@@ -529,6 +533,7 @@
       "leaked_answers": 0,
       "right_value_later_filing": 0,
       "right_value_same_day_filing": 0,
+      "right_value_before_availability": 0,
       "different_fiscal_period": 0,
       "restated_value_same_period": 0,
       "other": 0

@@ -23,13 +23,15 @@ from statistics import mean, median
 from typing import Callable, Iterable, Sequence
 
 from .backends import BACKENDS, BackendIndex
-from .evaluation import evaluate, scheduled_cases, write_evaluation
+from .evaluation import BOOTSTRAP_SAMPLES, _percentile, evaluate, scheduled_cases, write_evaluation
 from .factor import ForwardReturn, revenue_growth, spearman
 from .models import Fact, Query, Retrieval, iso_date, normalize_cik
 
 # Relative difference below which two filings of one period count as equal.
-# SEC values are reported in whole units, so this only absorbs float noise.
-REVISION_TOLERANCE = 1e-6
+# It absorbs only floating-point noise: any change in a reported value is a
+# revision, including rounding when a later 10-K reports in millions instead of
+# thousands (an earlier 1e-6 bound hid one such $8,000 change but not 21 others).
+REVISION_TOLERANCE = 1e-12
 
 
 def month_starts(start: str, end: str) -> list[str]:
@@ -41,7 +43,7 @@ def month_starts(start: str, end: str) -> list[str]:
     if first.day != 1:
         year, month = (year + 1, 1) if month == 12 else (year, month + 1)
     result = []
-    while date(year, month, 1) <= last:
+    while (year, month) <= (last.year, last.month):
         result.append(date(year, month, 1).isoformat())
         year, month = (year + 1, 1) if month == 12 else (year, month + 1)
     return result
@@ -71,20 +73,28 @@ def revision_profile(facts: Iterable[Fact]) -> dict:
     year even when filings disagree by a day on its start (both conventions
     occur in SEC data). Its original value comes from the earliest filing date.
     A period is *revised* when any later filing reports a different value.
-    Periods whose earliest filing date already carries conflicting values are
-    counted separately and excluded from the revision statistics.
+    Periods with conflicting values on any filing date are counted separately
+    and excluded from the revision statistics: a hash cannot decide which
+    same-day value is the original, revised, or final observation.
     """
     groups: dict[tuple, list[Fact]] = defaultdict(list)
     for fact in facts:
         groups[(fact.cik, fact.concept, fact.unit, fact.period_end)].append(fact)
     records = []
     conflicting = 0
+    conflicting_later = 0
     for key, rows in groups.items():
         rows.sort(key=lambda fact: (fact.filed, fact.fact_id))
         first_filed = rows[0].filed
         originals = [fact for fact in rows if fact.filed == first_filed]
         if len({fact.value for fact in originals}) > 1:
             conflicting += 1
+            continue
+        values_by_date: dict[str, set[float]] = defaultdict(set)
+        for fact in rows:
+            values_by_date[fact.filed].add(fact.value)
+        if any(len(values) > 1 for values in values_by_date.values()):
+            conflicting_later += 1
             continue
         original = originals[0]
         later = [fact for fact in rows if fact.filed > first_filed]
@@ -127,7 +137,8 @@ def revision_profile(facts: Iterable[Fact]) -> dict:
             "revised_share_of_refiled_periods": len(revised) / len(repeated) if repeated else None,
             "issuers_with_a_revision": len({r["cik"] for r in revised}),
             "median_abs_relative_change": median(sizes) if sizes else None,
-            "p90_abs_relative_change": sizes[int(0.9 * (len(sizes) - 1))] if sizes else None,
+            # Linear interpolation, like every other percentile in this package.
+            "p90_abs_relative_change": _percentile(sizes, 0.9),
             "share_of_revisions_above_1pct": (sum(size > 0.01 for size in sizes) / len(sizes)) if sizes else None,
             "median_revision_lag_days": median(lags) if lags else None,
             "median_days_period_end_to_first_filing": median(reporting) if reporting else None,
@@ -139,6 +150,7 @@ def revision_profile(facts: Iterable[Fact]) -> dict:
     return {
         "tolerance": REVISION_TOLERANCE,
         "conflicting_original_periods_excluded": conflicting,
+        "conflicting_later_periods_excluded": conflicting_later,
         "overall": summarize(records),
         "by_concept": {concept: summarize(rows) for concept, rows in sorted(by_concept.items())},
         "records": records,
@@ -152,6 +164,8 @@ def leak_breakdown(traces: Iterable[dict]) -> dict[str, dict[str, int]]:
     the question date (for example a comparative in the next 10-K).
     ``right_value_same_day_filing``: correct number, filed on the question date
     itself, which the conservative next-session rule treats as unavailable.
+    ``right_value_before_availability``: correct number, filed earlier but still
+    waiting for the next exchange session (for example over a holiday weekend).
     ``different_fiscal_period``: a fiscal year other than the point-in-time one,
     usually a year whose report had not been filed yet.
     ``restated_value_same_period``: the right fiscal year with a later value.
@@ -160,17 +174,21 @@ def leak_breakdown(traces: Iterable[dict]) -> dict[str, dict[str, int]]:
     for row in traces:
         counts = result.setdefault(row["backend"], {
             "leaked_answers": 0, "right_value_later_filing": 0, "right_value_same_day_filing": 0,
+            "right_value_before_availability": 0,
             "different_fiscal_period": 0, "restated_value_same_period": 0, "other": 0})
         if not row["answer_leaked"]:
             continue
         counts["leaked_answers"] += 1
         answer = row["answer"]
         if row["correct"]:
-            later = answer["filed"] > row["query"]["as_of"]
-            counts["right_value_later_filing" if later else "right_value_same_day_filing"] += 1
+            filed, as_of = answer["filed"], row["query"]["as_of"]
+            category = ("right_value_later_filing" if filed > as_of else
+                        "right_value_same_day_filing" if filed == as_of else
+                        "right_value_before_availability")
+            counts[category] += 1
         elif row["expected_period_end"] is not None and answer["period_end"] != row["expected_period_end"]:
             counts["different_fiscal_period"] += 1
-        elif row["expected_period_end"] is not None:
+        elif row["expected_period_end"] is not None and row["expected_status"] == "known":
             counts["restated_value_same_period"] += 1
         else:
             counts["other"] += 1
@@ -193,17 +211,23 @@ def signal_divergence(facts: Sequence[Fact], ciks: Iterable[str], dates: Iterabl
     (the issuer stopped reporting the concept). Issuer-dates without any
     point-in-time value are kept, because a naive signal there is look-ahead.
     """
+    if type(min_entities) is not int or min_entities < 2:
+        raise ValueError("min_entities must be an integer of at least 2")
+    if max_age_days is not None and (type(max_age_days) is not int or max_age_days < 0):
+        raise ValueError("max_age_days must be a nonnegative integer or None")
     facts = list(facts)
     index = BackendIndex(facts)
     ciks = sorted({normalize_cik(cik) for cik in ciks})
-    dates = sorted(set(dates))
+    dates = sorted({iso_date(value) for value in dates})
     stale: set[tuple[str, str]] = set()
     if max_age_days is not None:
         for as_of in dates:
             for cik in ciks:
-                current = index.retrieve(Query("age", cik, concept, unit, as_of), "bitemporal").fact
-                if current is not None and (date.fromisoformat(as_of)
-                                            - date.fromisoformat(current.period_end)).days > max_age_days:
+                current = index.retrieve(Query("age", cik, concept, unit, as_of), "bitemporal")
+                # Ambiguous winners still identify the newest eligible period.
+                period = max((f.period_end for f in current.context), default=None)
+                if period is not None and (date.fromisoformat(as_of)
+                                           - date.fromisoformat(period)).days > max_age_days:
                     stale.add((cik, as_of))
     signals: dict[str, dict[tuple[str, str], dict]] = {backend: {} for backend in BACKENDS}
     for backend in BACKENDS:
@@ -283,7 +307,7 @@ def _write_csv(path: Path, rows: list[dict], fields: Sequence[str]) -> None:
 
 def run_study(facts: Sequence[Fact], output_dir: str | Path, *, concepts: Sequence[str],
               signal_concept: str, start: str, end: str, unit: str = "USD",
-              names: dict[str, str] | None = None, bootstrap_samples: int = 500, seed: int = 7,
+              names: dict[str, str] | None = None, bootstrap_samples: int = BOOTSTRAP_SAMPLES, seed: int = 7,
               bitemporal_retriever: Callable[[Query], Retrieval] | None = None,
               storage: str = "in_memory_reference", max_age_days: int | None = 550) -> dict:
     """Run the three analyses on the given concepts and write their evidence.
@@ -294,8 +318,12 @@ def run_study(facts: Sequence[Fact], output_dir: str | Path, *, concepts: Sequen
     """
     if not concepts:
         raise ValueError("name at least one concept")
-    directory = Path(output_dir)
-    directory.mkdir(parents=True, exist_ok=True)
+    if signal_concept not in concepts:
+        # Otherwise the signal analysis, the example chart and its figure are
+        # silently empty while the command still succeeds.
+        raise ValueError(f"signal concept {signal_concept} must also be one of the study concepts")
+    if type(bootstrap_samples) is not int or bootstrap_samples < 0:
+        raise ValueError("bootstrap_samples must be a nonnegative integer")
     selected = [fact for fact in facts if fact.concept in set(concepts) and fact.unit == unit]
     if not selected:
         raise ValueError("no facts match the requested concepts and unit")
@@ -303,29 +331,31 @@ def run_study(facts: Sequence[Fact], output_dir: str | Path, *, concepts: Sequen
     schedule = month_starts(start, end)
     if not schedule:
         raise ValueError("the schedule contains no first-of-month date; widen --start/--end")
+    cases = scheduled_cases(selected, schedule, max_answer_age_days=max_age_days)
+    if not cases:
+        raise ValueError("no scheduled question falls inside the data's availability window")
 
     profile = revision_profile(selected)
     revised = [r for r in profile["records"] if r["revised"]]
     for record in revised:
         record["issuer"] = names.get(record["cik"], "")
+    report = evaluate(selected, cases, bootstrap_samples=bootstrap_samples, seed=seed,
+                      bitemporal_retriever=bitemporal_retriever)
+    bound = (f", while the point-in-time answer is at most {max_age_days} days past fiscal year end"
+             if max_age_days is not None else ", with no bound on the answer's age")
+    report["dataset"]["query_distribution"] = (
+        "latest-annual question on the first day of every month for every series, "
+        f"{schedule[0]} to {schedule[-1]}, from the series' first availability date{bound}")
+    report["dataset"]["concepts"] = list(concepts)
+    report["storage_mode"] = storage
+    breakdown = leak_breakdown(report["traces"])
+    directory = Path(output_dir)
+    directory.mkdir(parents=True, exist_ok=True)
     _write_csv(directory / "revisions.csv", revised,
                ["cik", "issuer", "concept", "unit", "period_start", "period_end", "original_value",
                 "original_filed", "original_accession", "first_revision_value", "first_revision_filed",
                 "first_revision_form", "first_revision_accession", "revision_lag_days", "relative_change",
                 "filings"])
-
-    cases = scheduled_cases(selected, schedule, max_answer_age_days=max_age_days)
-    if not cases:
-        raise ValueError("no scheduled question falls inside the data's availability window")
-    report = evaluate(selected, cases, bootstrap_samples=bootstrap_samples, seed=seed,
-                      bitemporal_retriever=bitemporal_retriever)
-    report["dataset"]["query_distribution"] = (
-        "latest-annual question on the first day of every month for every series, "
-        f"{schedule[0]} to {schedule[-1]}, from the series' first availability date, "
-        f"while the point-in-time answer is at most {max_age_days} days past fiscal year end")
-    report["dataset"]["concepts"] = list(concepts)
-    report["storage_mode"] = storage
-    breakdown = leak_breakdown(report["traces"])
     paths = write_evaluation(report, directory / "leakage", compress=True)
 
     signal_ciks = sorted({fact.cik for fact in selected if fact.concept == signal_concept})

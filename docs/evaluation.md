@@ -38,7 +38,7 @@ for difficult dates; their error rates do **not** estimate ordinary query traffi
 | Backend | Representation and ranking | Deliberate weakness |
 | --- | --- | --- |
 | `vector` | Signed 512-dimension feature-hash text vectors, cosine similarity, top 5 context | No date filter |
-| `overwrite` | One materialized newest-filing snapshot per CIK/concept/unit/start/end; conflicting same-day rows retained | Prior versions are absent; fiscal end is the only date filter |
+| `overwrite` | One materialized newest-filing snapshot per CIK/concept/unit/fiscal period end; conflicting same-day rows retained | Prior versions are absent; fiscal end is the only date filter |
 | `period_end` | All versions, filtered only by fiscal end; newest period and filing win | Treats period end as availability |
 | `bitemporal` | Filter by availability and period end before selecting the latest eligible period and filing | Intended correct retriever |
 
@@ -49,11 +49,16 @@ stand in for every production vector database. Replace it with a named embedding
 provider before making claims about embedding-model quality.
 
 `overwrite` constructs a separate reduced snapshot once. Retrieval cannot recover
-its discarded older filings. Some benchmarks make this baseline unrealistically
+its discarded older filings. A later filing that dates the same fiscal year's
+start a day differently still replaces the original, because one period end is
+one fiscal year here, as in the revision profile. Some benchmarks make this baseline unrealistically
 strong by retaining hidden history; this implementation does not.
 
 CLI evaluation of a DuckDB database injects `store.retrieve` as the bitemporal
-backend. The demo also uses DuckDB when installed. When it is unavailable, the
+backend. It writes each trace to disk as it is produced and keeps only
+per-issuer counts in memory. Because boundary questions grow with every fact,
+`evaluate` without `--concept` on a database of more than 50,000 facts requires
+the explicit `--all-concepts` flag. The demo also uses DuckDB when installed. When it is unavailable, the
 demo explicitly reports `in_memory_reference` and writes no database. That mode
 checks benchmark logic and fixtures; it does not validate DuckDB SQL or exchange
 calendar integration. `bitemporal_implementation` and `storage_mode` record which
@@ -66,7 +71,7 @@ bootstrap interval. A zero denominator produces JSON `null`.
 
 | Metric | Numerator | Denominator |
 | --- | --- | --- |
-| `accuracy` | Correct value and period, or correct abstention status | All queries |
+| `accuracy` | Correct issuer, concept, unit, value and period, or correct abstention status (an `ambiguous` answer counts only when it concerns the same conflicting period and filing date) | All queries |
 | `coverage` | Answered queries | All queries |
 | `answer_leakage_rate_all_queries` | Selected fact has `available_on > as_of` | All queries |
 | `answer_leakage_rate_answered` | Selected fact has `available_on > as_of` | Answered queries |
@@ -151,11 +156,17 @@ predeclared concept list (by default `us-gaap:Revenues`,
 `NetIncomeLoss`, unit USD).
 
 **Revision profile.** A fiscal period is identified by CIK, concept, unit,
-start and end. Its original value is the one on the earliest filing date. The
-period is *revised* when any later filing reports a value differing by more
-than one part per million. Periods whose earliest filing date already carries
-conflicting values are counted and excluded. Comparatives that repeat the
-same value are re-filings, not revisions.
+and period end. Different annual start-date conventions for the same year do
+not create extra periods. Its original value is the one on the earliest filing
+date. The period is *revised* when any later filing reports a different value
+(the comparison ignores only floating-point noise, a relative 1e-12). Rounding
+counts: some issuers later report the same year in millions instead of
+thousands, and those periods are revisions, usually small ones. Periods with
+conflicting values on any filing date are counted and excluded, with separate
+counts for original and later filing conflicts. Comparatives that repeat the
+same value are re-filings, not revisions. Size percentiles (median, 90th)
+interpolate linearly between observed revision sizes, as every other
+percentile in this package does.
 
 **Scheduled leakage audit.** Every series receives a latest-annual question on
 the first day of each month, starting at the series' first availability date.
@@ -165,6 +176,8 @@ issuer has stopped reporting (for example a revenue tag replaced in 2018) would
 be asked about for years; such questions can never leak and would dilute every
 rate. The bound uses only information available on the question date. The
 same bound removes stale issuer-months from the signal comparison.
+It also applies when the newest eligible period has conflicting values and
+therefore produces an ambiguous abstention.
 This schedule is easier to interpret than the boundary-enriched cases, but its
 rates still depend on it. Because no question precedes the first availability
 date, the correct-abstention denominator is zero on this schedule.
@@ -179,15 +192,18 @@ the original values, so no later date filter can repair it.
 
 `leaked_answer_breakdown` in `study.json` classifies every answer that used an
 unavailable fact: the right value cited from a later filing (or one filed on
-the question date), a different fiscal year (usually one whose report was not
+the question date), an earlier filing still awaiting its first exchange session,
+a different fiscal year (usually one whose report was not
 yet filed), or a restated value for the right year.
 
 **Signal divergence.** Annual revenue growth is computed by every backend with
 the same code for every issuer and month. The report counts signals that match
-the point-in-time signal, that differ from it, and that exist only because a
-backend used an unavailable fact, plus the per-date Spearman correlation of the
+the point-in-time signal, that differ from it, and that have no point-in-time
+counterpart, plus the per-date Spearman correlation of the
 cross-sectional ranking with the point-in-time ranking. No returns are used, so
 this measures contamination of the signal, not trading performance.
+Missing counterparts can also result from ambiguity or selection of a different
+period; the separate unavailable-fact count measures temporal leakage directly.
 
 ## Before reporting a real headline number
 

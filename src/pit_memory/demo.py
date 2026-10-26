@@ -97,6 +97,17 @@ def run_demo(output_dir: str | Path, issuers: int = 24, bootstrap_samples: int =
             raise ValueError(f"{facts_path} is not a demo output; use a new output directory") from exc
         if old_ids != {fact.fact_id for fact in data.facts}:
             raise ValueError("output contains a different dataset; use a new output directory")
+    # evaluate and factor write the same report names; never replace a real audit.
+    for name, is_demo in (("evaluation.json", lambda report: report.get("dataset", {}).get("synthetic") is True),
+                          ("factor.json", lambda report: report.get("synthetic") is True)):
+        existing = directory / name
+        if existing.exists():
+            try:
+                ours = is_demo(json.loads(existing.read_text()))
+            except (ValueError, AttributeError):
+                ours = False
+            if not ours:
+                raise ValueError(f"{existing} is not a demo output; use a new output directory")
     db_path = directory / "demo.duckdb"
     database_paths = {}
     if importlib.util.find_spec("duckdb") is not None:

@@ -172,7 +172,7 @@ def test_transient_errors_retry_but_authorization_errors_stop(tmp_path, monkeypa
     def transient(request, timeout):
         calls.append(request)
         if len(calls) == 1:
-            raise HTTPError(request.full_url, 429, "Too Many Requests", {"Retry-After": "1"}, None)
+            raise HTTPError(request.full_url, 429, "Too Many Requests", {"Retry-After": "3"}, None)
         return BytesIO(raw)
 
     monkeypatch.setattr("pit_memory.sec.urlopen", transient)
@@ -180,12 +180,282 @@ def test_transient_errors_retry_but_authorization_errors_stop(tmp_path, monkeypa
     client = SecClient(tmp_path, "Offline fixture contact@example.test")
     client.download_companyfacts(123)
     assert len(calls) == 2
-    assert 1.0 in sleeps
+    assert 3.0 in sleeps  # Retry-After, not the default first backoff of 1 s
 
     def forbidden(request, timeout):
         raise HTTPError(request.full_url, 403, "Forbidden", {}, None)
 
     monkeypatch.setattr("pit_memory.sec.urlopen", forbidden)
-    with pytest.raises(HTTPError) as error:
+    with pytest.raises(RuntimeError, match=r"CIK 0000000123 failed: HTTP 403.*SEC_USER_AGENT") as error:
         client.download_companyfacts(123, refresh=True)
-    assert error.value.code == 403
+    assert error.value.__cause__.code == 403
+
+
+def test_missing_companyfacts_names_the_cik(tmp_path, monkeypatch):
+    def missing(request, timeout):
+        raise HTTPError(request.full_url, 404, "Not Found", {}, None)
+
+    monkeypatch.setattr("pit_memory.sec.urlopen", missing)
+    client = SecClient(tmp_path, "Offline fixture contact@example.test")
+    with pytest.raises(RuntimeError, match=r"CIK 0000999999 .*HTTP 404.*no XBRL companyfacts"):
+        client.download_companyfacts(999999)
+
+
+@pytest.mark.parametrize("setting,value", [
+    ("min_interval", float("nan")), ("min_interval", float("inf")),
+    ("min_interval", "0.2"), ("min_interval", True),
+    ("timeout", float("nan")), ("timeout", float("inf")),
+    ("timeout", "30"), ("timeout", True),
+    ("retries", 1.5), ("retries", float("nan")),
+    ("retries", "3"), ("retries", True),
+])
+def test_invalid_client_settings_fail_before_network(tmp_path, setting, value):
+    with pytest.raises(ValueError, match="min_interval"):
+        SecClient(tmp_path, "Offline fixture contact@example.test", **{setting: value})
+
+
+@pytest.mark.parametrize("digest", [123, [], "A" * 64])
+def test_invalid_source_digest_is_a_validation_error(digest):
+    with pytest.raises(ValueError, match="source_sha256"):
+        parse_companyfacts(payload([row()]), source_sha256=digest)
+
+
+@pytest.mark.parametrize("response", [[], None, 42, {"cik": 123, "facts": []},
+                                      {"cik": 456, "facts": {}}, {"facts": {}}])
+def test_wrong_download_shape_or_company_never_becomes_a_snapshot(tmp_path, monkeypatch, response):
+    monkeypatch.setattr("pit_memory.sec.urlopen", lambda request, timeout: BytesIO(json.dumps(response).encode()))
+    client = SecClient(tmp_path, "Offline fixture contact@example.test")
+    with pytest.raises(ValueError, match="requested companyfacts CIK"):
+        client.download_companyfacts(123)
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("cached_raw", [b"not json", b"[]", b"null", b"\xff",
+                                       b'{"cik":456,"facts":{}}',
+                                       b'{"cik":123,"facts":[]}'])
+def test_hash_valid_cache_still_requires_matching_companyfacts(tmp_path, monkeypatch, cached_raw):
+    sha = hashlib.sha256(cached_raw).hexdigest()
+    (tmp_path / f"CIK0000000123.{sha}.json").write_bytes(cached_raw)
+    (tmp_path / "CIK0000000123.latest.json").write_text(json.dumps({"sha256": sha}))
+    raw = json.dumps(payload([row()])).encode()
+    downloads = []
+
+    def download(request, timeout):
+        downloads.append(request)
+        return BytesIO(raw)
+
+    monkeypatch.setattr("pit_memory.sec.urlopen", download)
+    client = SecClient(tmp_path, "Offline fixture contact@example.test")
+    assert client.download_companyfacts(123).read_bytes() == raw
+    assert len(downloads) == 1
+
+
+def test_invalid_response_encoding_is_retried(tmp_path, monkeypatch):
+    raw = json.dumps(payload([row()])).encode()
+    responses = iter([b"\xff", raw])
+    monkeypatch.setattr("pit_memory.sec.urlopen", lambda request, timeout: BytesIO(next(responses)))
+    monkeypatch.setattr("pit_memory.sec.time.sleep", lambda _seconds: None)
+    client = SecClient(tmp_path, "Offline fixture contact@example.test")
+    assert client.download_companyfacts(123).read_bytes() == raw
+
+
+def test_simultaneous_refreshes_keep_both_snapshots_and_an_intact_pointer(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    import os
+    import threading
+
+    raws = [json.dumps(payload([row(val=value)])).encode() for value in (100, 90)]
+    responses = iter(raws)
+    monkeypatch.setattr("pit_memory.sec.urlopen", lambda request, timeout: BytesIO(next(responses)))
+    pointer_ready = threading.Barrier(2)
+    replace = os.replace
+
+    def concurrent_replace(source, destination):
+        if str(destination).endswith("latest.json"):
+            # Both clients have finished writing their pointer temporary files.
+            # Reusing a fixed name here makes one replace lose the other's file.
+            pointer_ready.wait(timeout=5)
+        return replace(source, destination)
+
+    monkeypatch.setattr("pit_memory.sec.os.replace", concurrent_replace)
+    clients = [SecClient(tmp_path, "Offline fixture contact@example.test") for _ in range(2)]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        paths = list(pool.map(lambda client: client.download_companyfacts(123, refresh=True), clients))
+    assert {path.read_bytes() for path in paths} == set(raws)
+    pointer = json.loads((tmp_path / "CIK0000000123.latest.json").read_text())
+    snapshot = tmp_path / f"CIK0000000123.{pointer['sha256']}.json"
+    assert snapshot.read_bytes() in raws
+    assert hashlib.sha256(snapshot.read_bytes()).hexdigest() == pointer["sha256"]
+    assert not list(tmp_path.glob("*.part"))
+
+
+def test_failed_pointer_replace_keeps_previous_cache_and_cleans_temporary(tmp_path, monkeypatch):
+    import os
+
+    original = json.dumps(payload([row()])).encode()
+    updated = json.dumps(payload([row(val=90)])).encode()
+    responses = iter([original, updated])
+    monkeypatch.setattr("pit_memory.sec.urlopen", lambda request, timeout: BytesIO(next(responses)))
+    monkeypatch.setattr("pit_memory.sec.time.sleep", lambda _seconds: None)
+    client = SecClient(tmp_path, "Offline fixture contact@example.test")
+    prior = client.download_companyfacts(123)
+    replace = os.replace
+
+    def failed_replace(source, destination):
+        if str(destination).endswith("latest.json"):
+            raise OSError("simulated write failure")
+        return replace(source, destination)
+
+    monkeypatch.setattr("pit_memory.sec.os.replace", failed_replace)
+    with pytest.raises(OSError, match="simulated write failure"):
+        client.download_companyfacts(123, refresh=True)
+    assert client.download_companyfacts(123) == prior
+    assert prior.read_bytes() == original
+    assert not list(tmp_path.glob("*.part"))
+
+
+
+
+# ---- proposed: ingestion scope boundaries
+@pytest.mark.parametrize("form", ["10-K", "10-K/A", "20-F", "20-F/A", "40-F", "40-F/A"])
+def test_every_supported_annual_form_is_ingested(form):
+    result = parse_companyfacts(payload([row(form=form)]), calendar=fake_calendar)
+    assert [fact.form for fact in result.facts] == [form]
+
+
+@pytest.mark.parametrize("start,kept", [("2019-01-11", False), ("2019-01-10", True),
+                                        ("2018-12-21", True), ("2018-12-20", False),
+                                        ("2019-02-01", False), ("2018-11-29", False)])
+def test_annual_duration_window_is_355_to_375_days(start, kept):
+    # Durations against end 2019-12-31: 354, 355, 375 and 376 days, then an
+    # 11-month (333-day) and a 13-month (397-day) fiscal transition period.
+    result = parse_companyfacts(payload([row(start=start)]), calendar=fake_calendar)
+    assert (len(result.facts), result.skipped) == ((1, 0) if kept else (0, 1))
+    if not kept:
+        assert result.skipped_by_reason == {"period not 355-375 days": 1}
+
+
+def test_skipped_rows_are_counted_by_reason():
+    rows = [row(form="10-Q", start="2019-10-01"), row(form="8-K"), row(form="8-K"),
+            {key: value for key, value in row().items() if key != "start"}, row()]
+    result = parse_companyfacts(payload(rows), calendar=fake_calendar)
+    assert len(result.facts) == 1 and result.skipped == 4
+    assert result.skipped_by_reason == {"form 10-Q": 1, "annual-length period on form 8-K": 2,
+                                        "instant fact (no start date)": 1}
+
+
+class _Response(BytesIO):
+    def __init__(self, raw, headers):
+        super().__init__(raw)
+        self.headers = headers
+
+
+@pytest.mark.parametrize("encoding", ["gzip", "deflate", "identity"])
+def test_compressed_downloads_are_stored_decompressed_with_their_date(tmp_path, monkeypatch, encoding):
+    import gzip
+    import zlib
+    raw = json.dumps(payload([row()])).encode()
+    body = {"gzip": gzip.compress, "deflate": zlib.compress, "identity": lambda data: data}[encoding](raw)
+    sent = []
+
+    def respond(request, timeout):
+        sent.append(request.get_header("Accept-encoding"))
+        return _Response(body, {"Content-Encoding": encoding, "Last-Modified": "Thu, 22 Oct 2026 21:00:00 GMT"})
+
+    monkeypatch.setattr("pit_memory.sec.urlopen", respond)
+    client = SecClient(tmp_path, "Offline fixture contact@example.test")
+    path = client.download_companyfacts(123)
+    assert path.read_bytes() == raw
+    assert path.name == f"CIK0000000123.{hashlib.sha256(raw).hexdigest()}.json"
+    assert sent == ["gzip, deflate"]
+    metadata = client.snapshot_metadata(123)
+    assert metadata["last_modified"] == "Thu, 22 Oct 2026 21:00:00 GMT"
+    assert metadata["downloaded_at"].endswith("+00:00")
+
+
+def test_truncated_compressed_body_is_retried(tmp_path, monkeypatch):
+    import gzip
+    raw = json.dumps(payload([row()])).encode()
+    bodies = [gzip.compress(raw)[:20], gzip.compress(raw)]
+    monkeypatch.setattr("pit_memory.sec.urlopen",
+                        lambda request, timeout: _Response(bodies.pop(0), {"Content-Encoding": "gzip"}))
+    monkeypatch.setattr("pit_memory.sec.time.sleep", lambda seconds: None)
+    client = SecClient(tmp_path, "Offline fixture contact@example.test")
+    assert client.download_companyfacts(123).read_bytes() == raw
+    assert bodies == []
+
+
+def test_malformed_accession_is_rejected_and_source_url_is_canonical():
+    result = parse_companyfacts(payload([row(accn="0000000123-20-1"), row()]), calendar=fake_calendar)
+    assert len(result.rejected) == 1 and "accession" in result.rejected[0]["reason"]
+    assert result.facts[0].source_url == (
+        "https://www.sec.gov/Archives/edgar/data/123/000000012320000001/0000000123-20-000001-index.html")
+
+
+# ---- proposed: retry policy and rate limit
+def test_server_errors_and_url_errors_are_retried_honoring_capped_retry_after(tmp_path, monkeypatch):
+    from urllib.error import URLError
+    raw = json.dumps(payload([row()])).encode()
+    failures = [HTTPError("u", 503, "Unavailable", {"Retry-After": "7"}, None),
+                HTTPError("u", 500, "Error", {"Retry-After": "120"}, None),
+                URLError("temporary failure in name resolution")]
+    sleeps, calls = [], []
+
+    def flaky(request, timeout):
+        calls.append(request)
+        if len(calls) <= len(failures):
+            raise failures[len(calls) - 1]
+        return BytesIO(raw)
+
+    monkeypatch.setattr("pit_memory.sec.urlopen", flaky)
+    monkeypatch.setattr("pit_memory.sec.time.sleep", sleeps.append)
+    client = SecClient(tmp_path, "Offline fixture contact@example.test")
+    assert client.download_companyfacts(123).read_bytes() == raw
+    assert len(calls) == 4
+    backoff = [seconds for seconds in sleeps if seconds >= 1]
+    assert backoff == [7.0, 30.0, 4]  # Retry-After, Retry-After capped at 30 s, 2**2
+
+
+def test_consecutive_requests_are_spaced_by_min_interval(tmp_path, monkeypatch):
+    raw = json.dumps(payload([row()])).encode()
+    monkeypatch.setattr("pit_memory.sec.urlopen", lambda request, timeout: BytesIO(raw))
+    clock, sleeps = [1000.0], []
+
+    def sleep(seconds):
+        sleeps.append(seconds)
+        clock[0] += seconds
+
+    monkeypatch.setattr("pit_memory.sec.time.monotonic", lambda: clock[0])
+    monkeypatch.setattr("pit_memory.sec.time.sleep", sleep)
+    client = SecClient(tmp_path, "Offline fixture contact@example.test", min_interval=0.5)
+    client.download_companyfacts(123)
+    client.download_companyfacts(123, refresh=True)
+    assert sleeps == [pytest.approx(0.5)]
+
+
+def test_no_backoff_sleep_after_the_final_attempt(tmp_path, monkeypatch):
+    def unavailable(request, timeout):
+        raise HTTPError(request.full_url, 503, "Unavailable", {}, None)
+
+    sleeps = []
+    monkeypatch.setattr("pit_memory.sec.urlopen", unavailable)
+    monkeypatch.setattr("pit_memory.sec.time.sleep", sleeps.append)
+    client = SecClient(tmp_path, "Offline fixture contact@example.test", retries=2)
+    with pytest.raises(RuntimeError, match="after 3 attempt"):
+        client.download_companyfacts(123)
+    assert [seconds for seconds in sleeps if seconds >= 1] == [1, 2]
+
+
+def test_user_agent_needs_a_name_besides_the_address(tmp_path):
+    with pytest.raises(ValueError, match="SEC_USER_AGENT"):
+        SecClient(tmp_path, "contact@example.test")
+
+
+@pytest.mark.parametrize("changes,reason", [
+    ({"start": "2020-01-01", "end": "2019-12-31"}, "ends before it starts"),
+    ({"start": "2019-03-02", "end": "2020-03-01"}, "ends after filing"),
+])
+def test_impossible_annual_rows_are_quarantined_with_their_reason(changes, reason):
+    result = parse_companyfacts(payload([row(**changes)]), calendar=fake_calendar)
+    assert result.facts == [] and result.skipped == 0
+    assert reason in result.rejected[0]["reason"]

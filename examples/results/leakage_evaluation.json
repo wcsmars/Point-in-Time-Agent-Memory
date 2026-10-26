@@ -15,11 +15,11 @@
   },
   "bootstrap": {
     "unit": "issuer",
-    "samples": 500,
+    "samples": 10000,
     "seed": 7,
     "method": "percentile cluster bootstrap; CI unavailable below two issuers"
   },
-  "index_build_ms": 56.109916884452105,
+  "index_build_ms": 142.36774999881163,
   "bitemporal_implementation": "provided_retriever",
   "backends": {
     "vector": {
@@ -31,10 +31,10 @@
           "numerator": 2884,
           "denominator": 15543,
           "ci95": [
-            0.127248704274432,
-            0.2522379324614717
+            0.12396199164312668,
+            0.25583916207005253
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "coverage": {
           "value": 1.0,
@@ -44,57 +44,57 @@
             1.0,
             1.0
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "answer_leakage_rate_all_queries": {
           "value": 0.7422633983143537,
           "numerator": 11537,
           "denominator": 15543,
           "ci95": [
-            0.6726276264412415,
-            0.8087558626548828
+            0.6644893400074149,
+            0.8152332299654358
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "answer_leakage_rate_answered": {
           "value": 0.7422633983143537,
           "numerator": 11537,
           "denominator": 15543,
           "ci95": [
-            0.6726276264412415,
-            0.8087558626548828
+            0.6644893400074149,
+            0.8152332299654358
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "context_leakage_rate": {
           "value": 0.9177121533809431,
           "numerator": 14264,
           "denominator": 15543,
           "ci95": [
-            0.9089810942666725,
-            0.929137946671902
+            0.9073436956615766,
+            0.927434682758948
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "future_filing_answer_rate_all_queries": {
           "value": 0.7403332689956894,
           "numerator": 11507,
           "denominator": 15543,
           "ci95": [
-            0.6708413004084883,
-            0.8072250432891621
+            0.66176995860111,
+            0.8136979119746913
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "leaked_and_incorrect_rate": {
           "value": 0.7213536640288233,
           "numerator": 11212,
           "denominator": 15543,
           "ci95": [
-            0.6479806793758585,
-            0.7943122698491241
+            0.6413757034688705,
+            0.797569490053808
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "correct_abstention_rate": {
           "value": null,
@@ -105,8 +105,8 @@
         }
       },
       "latency_ms": {
-        "mean": 0.05006239900067914,
-        "p95": 0.06262492388486862
+        "mean": 0.11188073664501763,
+        "p95": 0.06375001976266503
       },
       "cost": {
         "llm_calls": 0,
@@ -124,10 +124,10 @@
           "numerator": 12079,
           "denominator": 15543,
           "ci95": [
-            0.7443981690377511,
-            0.8065158289040041
+            0.7458910676825014,
+            0.8062014901268508
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "coverage": {
           "value": 1.0,
@@ -137,57 +137,57 @@
             1.0,
             1.0
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "answer_leakage_rate_all_queries": {
           "value": 0.9172617898732548,
           "numerator": 14257,
           "denominator": 15543,
           "ci95": [
-            0.9054211137589062,
-            0.931153263865188
+            0.9040706253676309,
+            0.9289451987315887
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "answer_leakage_rate_answered": {
           "value": 0.9172617898732548,
           "numerator": 14257,
           "denominator": 15543,
           "ci95": [
-            0.9054211137589062,
-            0.931153263865188
+            0.9040706253676309,
+            0.9289451987315887
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "context_leakage_rate": {
           "value": 0.9172617898732548,
           "numerator": 14257,
           "denominator": 15543,
           "ci95": [
-            0.9054211137589062,
-            0.931153263865188
+            0.9040706253676309,
+            0.9289451987315887
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "future_filing_answer_rate_all_queries": {
           "value": 0.9168114263655665,
           "numerator": 14250,
           "denominator": 15543,
           "ci95": [
-            0.9050602192855767,
-            0.9308216926400859
+            0.903532647271584,
+            0.9285988202680344
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "leaked_and_incorrect_rate": {
           "value": 0.222865598661777,
           "numerator": 3464,
           "denominator": 15543,
           "ci95": [
-            0.19348417109599592,
-            0.25560183096224887
+            0.1937985098731491,
+            0.25410893231749865
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "correct_abstention_rate": {
           "value": null,
@@ -198,8 +198,8 @@
         }
       },
       "latency_ms": {
-        "mean": 0.00395893173742032,
-        "p95": 0.004750210791826248
+        "mean": 0.007507512220679153,
+        "p95": 0.004875008016824722
       },
       "cost": {
         "llm_calls": 0,
@@ -217,10 +217,10 @@
           "numerator": 12079,
           "denominator": 15543,
           "ci95": [
-            0.7443981690377511,
-            0.8065158289040041
+            0.7458910676825014,
+            0.8062014901268508
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "coverage": {
           "value": 1.0,
@@ -230,57 +230,57 @@
             1.0,
             1.0
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "answer_leakage_rate_all_queries": {
           "value": 0.9172617898732548,
           "numerator": 14257,
           "denominator": 15543,
           "ci95": [
-            0.9054211137589062,
-            0.931153263865188
+            0.9040706253676309,
+            0.9289451987315887
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "answer_leakage_rate_answered": {
           "value": 0.9172617898732548,
           "numerator": 14257,
           "denominator": 15543,
           "ci95": [
-            0.9054211137589062,
-            0.931153263865188
+            0.9040706253676309,
+            0.9289451987315887
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "context_leakage_rate": {
           "value": 0.9172617898732548,
           "numerator": 14257,
           "denominator": 15543,
           "ci95": [
-            0.9054211137589062,
-            0.931153263865188
+            0.9040706253676309,
+            0.9289451987315887
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "future_filing_answer_rate_all_queries": {
           "value": 0.9168114263655665,
           "numerator": 14250,
           "denominator": 15543,
           "ci95": [
-            0.9050602192855767,
-            0.9308216926400859
+            0.903532647271584,
+            0.9285988202680344
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "leaked_and_incorrect_rate": {
           "value": 0.222865598661777,
           "numerator": 3464,
           "denominator": 15543,
           "ci95": [
-            0.19348417109599592,
-            0.25560183096224887
+            0.1937985098731491,
+            0.25410893231749865
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "correct_abstention_rate": {
           "value": null,
@@ -291,8 +291,8 @@
         }
       },
       "latency_ms": {
-        "mean": 0.012347425111196587,
-        "p95": 0.008958857506513596
+        "mean": 0.027373712630083223,
+        "p95": 0.009207986295223236
       },
       "cost": {
         "llm_calls": 0,
@@ -313,7 +313,7 @@
             1.0,
             1.0
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "coverage": {
           "value": 1.0,
@@ -323,7 +323,7 @@
             1.0,
             1.0
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "answer_leakage_rate_all_queries": {
           "value": 0.0,
@@ -333,7 +333,7 @@
             0.0,
             0.0
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "answer_leakage_rate_answered": {
           "value": 0.0,
@@ -343,7 +343,7 @@
             0.0,
             0.0
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "context_leakage_rate": {
           "value": 0.0,
@@ -353,7 +353,7 @@
             0.0,
             0.0
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "future_filing_answer_rate_all_queries": {
           "value": 0.0,
@@ -363,7 +363,7 @@
             0.0,
             0.0
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "leaked_and_incorrect_rate": {
           "value": 0.0,
@@ -373,7 +373,7 @@
             0.0,
             0.0
           ],
-          "bootstrap_valid_samples": 500
+          "bootstrap_valid_samples": 10000
         },
         "correct_abstention_rate": {
           "value": null,
@@ -384,8 +384,8 @@
         }
       },
       "latency_ms": {
-        "mean": 0.8753419829239979,
-        "p95": 1.0180623270571232
+        "mean": 3.288274151154432,
+        "p95": 8.33551670366432
       },
       "cost": {
         "llm_calls": 0,

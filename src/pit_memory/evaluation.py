@@ -8,13 +8,14 @@ import math
 import random
 import time
 from collections import defaultdict
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Iterator
 
 from .backends import BACKENDS, BackendIndex
-from .models import Fact, Query, Retrieval
+from .models import Fact, Query, Retrieval, iso_date
 
 
 @dataclass(frozen=True)
@@ -55,7 +56,10 @@ def _oracle(facts: tuple[Fact, ...], query: Query, category: str) -> EvaluationC
     filed = sorted({fact.filed for fact in eligible if fact.period_end == period})[-1]
     winners = [fact for fact in eligible if fact.period_end == period and fact.filed == filed]
     if len({(fact.value, fact.period_start) for fact in winners}) > 1:
-        return EvaluationCase(query, None, expected_status="ambiguous", category=category)
+        # The value is unknown, but the winning period/date are still known.
+        # Retain these so age filters apply equally to answers and abstentions.
+        return EvaluationCase(query, None, expected_status="ambiguous", category=category,
+                              expected_filed=filed, expected_period_end=period)
     chosen = min(winners, key=lambda fact: fact.fact_id)
     return EvaluationCase(query, chosen.value, chosen.fact_id, "known", category,
                           chosen.filed, chosen.period_end)
@@ -104,8 +108,11 @@ def scheduled_cases(facts: Iterable[Fact], dates: Iterable[str], prefix: str = "
     information available on the question date. Rates depend on the schedule
     and are reported with it.
     """
+    if (max_answer_age_days is not None
+            and (type(max_answer_age_days) is not int or max_answer_age_days < 0)):
+        raise ValueError("max_answer_age_days must be a nonnegative integer or None")
     facts = tuple(facts)
-    dates = sorted(set(dates))
+    dates = sorted({iso_date(value) for value in dates})
     scopes: dict[tuple[str, str, str], list[Fact]] = defaultdict(list)
     for fact in facts:
         scopes[(fact.cik, fact.concept, fact.unit)].append(fact)
@@ -150,31 +157,58 @@ def _metric_pairs(row: dict) -> dict[str, tuple[int, int]]:
     }
 
 
-def _summarize(rows: list[dict], bootstrap_samples: int, seed: int) -> dict:
-    names = list(_metric_pairs(rows[0])) if rows else [
-        "accuracy", "coverage", "answer_leakage_rate_all_queries", "answer_leakage_rate_answered",
-        "context_leakage_rate", "future_filing_answer_rate_all_queries", "leaked_and_incorrect_rate",
-        "correct_abstention_rate"]
-    clustered: dict[str, dict[str, list[int]]] = defaultdict(lambda: {name: [0, 0] for name in names})
-    for row in rows:
+# Issuer-cluster draws. With 500, each 2.5% tail rests on about 12 draws and
+# interval endpoints move by a percentage point between seeds; 10,000 keeps that
+# Monte Carlo error well below the 0.1-point precision results are reported at.
+BOOTSTRAP_SAMPLES = 10_000
+
+_METRICS = ("accuracy", "coverage", "answer_leakage_rate_all_queries", "answer_leakage_rate_answered",
+            "context_leakage_rate", "future_filing_answer_rate_all_queries", "leaked_and_incorrect_rate",
+            "correct_abstention_rate")
+
+
+class _Tally:
+    """Per-issuer numerators and denominators, so traces need not stay in memory."""
+
+    def __init__(self) -> None:
+        self.clustered: dict[str, dict[str, list[int]]] = {}
+        self.latencies: list[float] = []
+
+    def add(self, row: dict) -> None:
+        cluster = self.clustered.setdefault(row["query"]["cik"], {name: [0, 0] for name in _METRICS})
         for name, (numerator, denominator) in _metric_pairs(row).items():
-            counts = clustered[row["query"]["cik"]][name]
-            counts[0] += numerator
-            counts[1] += denominator
-    groups = list(clustered.values())
+            cluster[name][0] += numerator
+            cluster[name][1] += denominator
+        self.latencies.append(row["latency_ms"])
+
+    def summary(self, bootstrap_samples: int, seed: int) -> dict:
+        return _summary_from_clusters(list(self.clustered.values()), self.latencies, bootstrap_samples, seed)
+
+
+def _summarize(rows: list[dict], bootstrap_samples: int, seed: int) -> dict:
+    tally = _Tally()
+    for row in rows:
+        tally.add(row)
+    return tally.summary(bootstrap_samples, seed)
+
+
+def _summary_from_clusters(groups: list[dict[str, list[int]]], latencies: list[float],
+                           bootstrap_samples: int, seed: int) -> dict:
+    names = _METRICS
     totals = {name: [sum(group[name][i] for group in groups) for i in (0, 1)] for name in names}
     draws: dict[str, list[float]] = {name: [] for name in names}
     rng = random.Random(seed)
     # All queries from an issuer move together; repeated filing boundaries are
     # not falsely treated as independent observations.
     if len(groups) >= 2:
+        numerators = {name: [group[name][0] for group in groups] for name in names}
+        denominators = {name: [group[name][1] for group in groups] for name in names}
         for _ in range(bootstrap_samples):
-            sample = [groups[rng.randrange(len(groups))] for _ in groups]
+            sample = [rng.randrange(len(groups)) for _ in groups]
             for name in names:
-                n = sum(group[name][0] for group in sample)
-                d = sum(group[name][1] for group in sample)
+                d = sum(denominators[name][i] for i in sample)
                 if d:
-                    draws[name].append(n / d)
+                    draws[name].append(sum(numerators[name][i] for i in sample) / d)
     metrics = {}
     for name, (numerator, denominator) in totals.items():
         values = draws[name]
@@ -185,8 +219,7 @@ def _summarize(rows: list[dict], bootstrap_samples: int, seed: int) -> dict:
             "ci95": [_percentile(values, .025), _percentile(values, .975)] if values else None,
             "bootstrap_valid_samples": len(values),
         }
-    latencies = [row["latency_ms"] for row in rows]
-    return {"queries": len(rows), "issuer_clusters": len(groups), "metrics": metrics,
+    return {"queries": len(latencies), "issuer_clusters": len(groups), "metrics": metrics,
             "latency_ms": {"mean": sum(latencies) / len(latencies) if latencies else None,
                            "p95": _percentile(latencies, .95)},
             "cost": {"llm_calls": 0, "embedding_api_calls": 0, "api_usd": 0.0,
@@ -194,8 +227,15 @@ def _summarize(rows: list[dict], bootstrap_samples: int, seed: int) -> dict:
 
 
 def evaluate(facts: Iterable[Fact], cases: Iterable[EvaluationCase] | None = None,
-             bootstrap_samples: int = 500, seed: int = 7,
-             bitemporal_retriever: Callable[[Query], Retrieval] | None = None) -> dict:
+             bootstrap_samples: int = BOOTSTRAP_SAMPLES, seed: int = 7,
+             bitemporal_retriever: Callable[[Query], Retrieval] | None = None,
+             trace_sink: Callable[[dict], object] | None = None) -> dict:
+    """Score every backend on every case.
+
+    Traces are returned in ``report["traces"]``, or, with ``trace_sink``, handed
+    to it one at a time and not kept (``report["traces"]`` is then None), so a
+    large audit needs memory only for per-issuer counts.
+    """
     if bootstrap_samples < 0:
         raise ValueError("bootstrap_samples must be non-negative")
     facts = tuple(facts)
@@ -208,7 +248,7 @@ def evaluate(facts: Iterable[Fact], cases: Iterable[EvaluationCase] | None = Non
     traces = []
     summaries = {}
     for backend in BACKENDS:
-        rows = []
+        tally = _Tally()
         for case in cases:
             started = time.perf_counter()
             result = (bitemporal_retriever(case.query)
@@ -219,9 +259,20 @@ def evaluate(facts: Iterable[Fact], cases: Iterable[EvaluationCase] | None = Non
             correct = result.status == case.expected_status
             if case.expected_status == "known":
                 correct = bool(correct and fact is not None
+                               and (fact.cik, fact.concept, fact.unit)
+                               == (case.query.cik, case.query.concept, case.query.unit)
+                               and (case.query.period_end is None
+                                    or fact.period_end == case.query.period_end)
                                and math.isclose(fact.value, case.expected_value, rel_tol=1e-10, abs_tol=1e-9)
                                and (case.expected_period_end is None
                                     or fact.period_end == case.expected_period_end))
+            elif case.expected_status == "ambiguous" and correct:
+                # An abstention is right only for the same conflicting filing:
+                # ambiguity about a year that was not yet filed is not credit.
+                newest = max(((item.period_end, item.filed) for item in result.context
+                              if (item.cik, item.concept, item.unit)
+                              == (case.query.cik, case.query.concept, case.query.unit)), default=None)
+                correct = newest == (case.expected_period_end, case.expected_filed)
             row = {
                 "backend": backend,
                 "query": asdict(case.query),
@@ -243,9 +294,12 @@ def evaluate(facts: Iterable[Fact], cases: Iterable[EvaluationCase] | None = Non
                 "correct_abstention": case.expected_status == "not_known" and result.status == "not_known",
                 "latency_ms": latency,
             }
-            rows.append(row)
-        summaries[backend] = _summarize(rows, bootstrap_samples, seed)
-        traces.extend(rows)
+            tally.add(row)
+            if trace_sink is None:
+                traces.append(row)
+            else:
+                trace_sink(row)
+        summaries[backend] = tally.summary(bootstrap_samples, seed)
     return {
         "schema_version": 1,
         "experiment": "retrieval_only",
@@ -258,26 +312,40 @@ def evaluate(facts: Iterable[Fact], cases: Iterable[EvaluationCase] | None = Non
         "bitemporal_implementation": "provided_retriever" if bitemporal_retriever is not None else "in_memory_reference",
         "backends": summaries,
         "attribution": "Future facts in logged context prove retrieval exposure. This experiment runs no LLM and makes no claim about model-training leakage.",
-        "traces": traces,
+        "traces": traces if trace_sink is None else None,
     }
+
+
+def trace_path(output_dir: str | Path, compress: bool = False) -> Path:
+    return Path(output_dir) / ("retrievals.jsonl.gz" if compress else "retrievals.jsonl")
+
+
+@contextmanager
+def trace_writer(output_dir: str | Path, compress: bool = False) -> Iterator[Callable[[dict], None]]:
+    """A ``trace_sink`` for ``evaluate`` that writes one JSON line per trace as it arrives."""
+    path = trace_path(output_dir, compress)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with (gzip.open(path, "wt", encoding="utf-8") if compress else path.open("w")) as handle:
+        yield lambda trace: handle.write(json.dumps(trace, allow_nan=False) + "\n")
 
 
 def write_evaluation(report: dict, output_dir: str | Path, compress: bool = False) -> dict[str, str]:
     """Write aggregate metrics, one trace per query and backend, and a flat summary.
 
     ``compress`` gzips the trace file, which is useful for large real-data runs.
+    A report produced with ``trace_writer`` already has its trace file.
     """
     directory = Path(output_dir)
     directory.mkdir(parents=True, exist_ok=True)
     report_path = directory / "evaluation.json"
-    traces_path = directory / ("retrievals.jsonl.gz" if compress else "retrievals.jsonl")
+    traces_path = trace_path(directory, compress)
     summary_path = directory / "summary.csv"
     report_path.write_text(json.dumps({key: value for key, value in report.items() if key != "traces"},
                                       indent=2, allow_nan=False) + "\n")
-    opener = (lambda: gzip.open(traces_path, "wt", encoding="utf-8")) if compress else (lambda: traces_path.open("w"))
-    with opener() as handle:
-        for trace in report["traces"]:
-            handle.write(json.dumps(trace, allow_nan=False) + "\n")
+    if report["traces"] is not None:
+        with trace_writer(directory, compress) as write:
+            for trace in report["traces"]:
+                write(trace)
     with summary_path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=["backend", "metric", "value", "numerator",
                                                    "denominator", "ci95_low", "ci95_high"])

@@ -98,7 +98,8 @@ def plot_study(study_dir: str | Path, output_dir: str | Path) -> list[str]:
         output_dir / "sec_leakage_by_backend.png", PANELS))
 
     plt = _pyplot()
-    rows = list(csv.DictReader((study_dir / "revisions.csv").open()))
+    with (study_dir / "revisions.csv").open(newline="") as handle:
+        rows = list(csv.DictReader(handle))
     sizes = [abs(float(r["relative_change"])) for r in rows if r["relative_change"] not in ("", None)]
     sizes = [s for s in sizes if s > 0]
     # Remove figures an earlier run drew, so a run without them leaves none stale.
@@ -106,10 +107,14 @@ def plot_study(study_dir: str | Path, output_dir: str | Path) -> list[str]:
         (output_dir / name).unlink(missing_ok=True)
     if sizes:
         fig, ax = plt.subplots(figsize=(7.2, 3.4))
-        edges = [10 ** (x / 4) for x in range(-24, 5)]
-        ax.hist(sizes, bins=edges, color=COLORS["bitemporal"], edgecolor=SURFACE, linewidth=1.5)
+        edges = [10 ** (x / 4) for x in range(-28, 5)]
+        # Clip into the outer bins so every revision is drawn and the bars add
+        # up to the count in the title (a restated near-zero value can exceed 1000%).
+        clipped = [min(max(size, edges[0]), edges[-1]) for size in sizes]
+        ax.hist(clipped, bins=edges, color=COLORS["bitemporal"], edgecolor=SURFACE, linewidth=1.5)
         ax.set_xscale("log")
-        ax.set_xticks([1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1], ["0.001%", "0.01%", "0.1%", "1%", "10%", "100%"])
+        ax.set_xticks([1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1],
+                      ["0.0001%", "0.001%", "0.01%", "0.1%", "1%", "10%", "100%"])
         ax.set_xlabel("Size of revision relative to the originally filed value")
         ax.set_ylabel("Revised fiscal periods")
         from matplotlib.ticker import MaxNLocator
@@ -130,8 +135,11 @@ def plot_study(study_dir: str | Path, output_dir: str | Path) -> list[str]:
         for backend in ("overwrite", "bitemporal"):
             ys = [r[backend] / 1e9 if r[backend] is not None else math.nan for r in example["rows"]]
             ax.step(xs, ys, where="post", color=COLORS[backend], linewidth=2.2, label=LABELS[backend])
-        ax.set_ylim(0, max(v for r in example["rows"] for v in (r["overwrite"], r["bitemporal"])
-                           if v is not None) / 1e9 * 1.18)
+        values = [v / 1e9 for r in example["rows"] for v in (r["overwrite"], r["bitemporal"])
+                  if v is not None]
+        low, high = min(0.0, min(values)), max(0.0, max(values))
+        span = high - low or 1.0
+        ax.set_ylim(low - (0.12 * span if low < 0 else 0), high + 0.3 * span)
         for when, text in ((example["original_filed"], "original 10-K filed"),
                            (example["first_revision_filed"], "different value filed")):
             ax.axvline(date.fromisoformat(when), color=INK_2, linewidth=0.8, linestyle=(0, (3, 3)))
@@ -140,10 +148,9 @@ def plot_study(study_dir: str | Path, output_dir: str | Path) -> list[str]:
         name = example["issuer"] or f"CIK {example['cik']}"
         ax.set_title(f"{name}: fiscal year ending {example['period_end']}, value reported as of each date",
                      loc="left")
-        ax.set_ylabel(f"{example['concept'].split(':')[1][:40]} (USD bn)")
+        ax.set_ylabel(f"{example['concept'].split(':', 1)[-1][:40]} ({example['unit']} bn)")
         ax.yaxis.grid(True, color=GRID, linewidth=0.8)
         ax.set_axisbelow(True)
-        ax.set_ylim(0, ax.get_ylim()[1] * 1.12)
         ax.legend(loc="lower center", fontsize=8, ncol=2)
         ax.tick_params(length=0)
         fig.tight_layout()
@@ -156,20 +163,23 @@ def plot_study(study_dir: str | Path, output_dir: str | Path) -> list[str]:
         for k in ("changed_vs_bitemporal", "mean_rank_correlation_with_bitemporal"))
     for backend in ("vector", "period_end") if identical else ("vector", "overwrite", "period_end"):
         label = "Overwrite and period end (identical here)" if identical and backend == "period_end" else LABELS[backend]
-        points = [(date.fromisoformat(r["as_of"]), r["rank_correlation_with_bitemporal"])
-                  for r in divergence["per_date"]
-                  if r["backend"] == backend and r["rank_correlation_with_bitemporal"] is not None]
-        if points:
-            ax.plot([p[0] for p in points], [p[1] for p in points], color=COLORS[backend],
-                    linewidth=1.6, label=label)
+        rows = [r for r in divergence["per_date"] if r["backend"] == backend]
+        # NaN leaves a gap on dates without a defined correlation instead of a
+        # straight line drawn across them.
+        values = [math.nan if r["rank_correlation_with_bitemporal"] is None
+                  else r["rank_correlation_with_bitemporal"] for r in rows]
+        if any(not math.isnan(value) for value in values):
+            ax.plot([date.fromisoformat(r["as_of"]) for r in rows], values, color=COLORS[backend],
+                    linewidth=1.6, label=label, marker="o" if len(rows) == 1 else None)
     ax.set_ylim(min(0.0, ax.get_ylim()[0]), 1.25)
-    ax.set_yticks([t for t in (-0.5, -0.25, 0, 0.25, 0.5, 0.75, 1.0) if t >= ax.get_ylim()[0]])
+    ax.set_yticks([t for t in (-1.0, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1.0) if t >= ax.get_ylim()[0]])
     ax.axhline(1, color=GRID, linewidth=0.8)
     ax.set_ylabel("Rank correlation with\npoint-in-time signal")
     ax.set_title("Cross-sectional revenue-growth ranking under each backend", loc="left")
     ax.yaxis.grid(True, color=GRID, linewidth=0.8)
     ax.set_axisbelow(True)
-    ax.legend(loc="upper left", fontsize=8, ncol=2)
+    if ax.get_legend_handles_labels()[0]:
+        ax.legend(loc="upper left", fontsize=8, ncol=2)
     ax.tick_params(length=0)
     fig.tight_layout()
     written.append(_save(fig, output_dir / "sec_signal_rank_correlation.png"))

@@ -5,6 +5,7 @@ and applies the rule from docs/evaluation.md literally. DuckDB SQL, the
 in-memory backend and ``select_latest`` must agree with it on status, value,
 fiscal period and filing date for every query.
 """
+from dataclasses import replace
 import importlib.util
 import random
 from datetime import date, timedelta
@@ -95,6 +96,7 @@ def check(rows, queries, store):
         for result in (store.retrieve(query), index.retrieve(query, "bitemporal"), select_latest(query, rows)):
             assert outcome(result) == expected, (query, result.backend)
             assert all(f.available_on <= query.as_of for f in result.context)
+            assert len({f.fact_id for f in result.context}) == len(result.context)
         checked += 1
         ambiguous += expected[0] == "ambiguous"
     return checked, ambiguous
@@ -119,3 +121,31 @@ def test_real_sec_sample_all_implementations_agree():
         store.append(rows)
         checked, _ = check(rows, random_queries(rows, 3000, seed=9), store)
     assert checked == 3000
+
+
+def with_awkward_rows(rows, seed=3):
+    """Exact repeats, same-day rows that only redate the start, and signed zeros."""
+    rng = random.Random(seed)
+    out = []
+    for row in rows:
+        roll = rng.random()
+        if roll < 0.03:  # 0.0 and -0.0 are one value, though their digests differ
+            row = replace(row, value=0.0, fact_id="")
+            out.append(replace(row, value=-0.0, accession=row.accession + "n", fact_id=""))
+        out.append(row)
+        if 0.03 <= roll < 0.08:
+            out.append(Fact(**row.to_dict()))  # the same fact twice, e.g. two joined exports
+        elif 0.08 <= roll < 0.11:
+            start = (date.fromisoformat(row.period_start) - timedelta(days=1)).isoformat()
+            out.append(replace(row, period_start=start, accession=row.accession + "s", fact_id=""))
+    return out
+
+
+@needs_duckdb
+def test_repeats_redated_starts_and_signed_zeros_agree_everywhere():
+    rows = with_awkward_rows(stress_corpus(seed=23))
+    assert len({row.fact_id for row in rows}) < len(rows)  # the corpus really has repeats
+    with DuckDBStore() as store:
+        store.append(rows)
+        checked, ambiguous = check(rows, random_queries(rows, 3000, seed=13), store)
+    assert checked == 3000 and ambiguous > 20

@@ -25,7 +25,9 @@ manuscript/
 slides/
 *.tex
 *.bib
+*.doc
 *.docx
+*.odt
 *.pdf
 *.ppt
 *.pptx
