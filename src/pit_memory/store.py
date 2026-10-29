@@ -77,7 +77,7 @@ class DuckDBStore:
                 except Exception:
                     self.connection.execute("ROLLBACK")
                     raise
-        except duckdb.Error as exc:
+        except (duckdb.Error, ValueError) as exc:
             if hasattr(self, "connection"):
                 self.connection.close()
             raise RuntimeError(f"Could not open DuckDB database {target}: {exc}") from exc
@@ -103,8 +103,20 @@ class DuckDBStore:
         self.connection.execute("CREATE INDEX IF NOT EXISTS facts_lookup ON facts(cik, concept, unit, available_on)")
 
     def _validate_schema(self) -> None:
-        self.connection.execute(f"SELECT {_SELECT} FROM facts LIMIT 0")
-        self.connection.execute("SELECT fact_id, source_sha256, source_url FROM fact_sources LIMIT 0")
+        # Merely selecting the column names accepts a table copied with CREATE
+        # TABLE AS (which loses the primary key), or one whose value is TEXT.
+        # Those databases cannot preserve idempotent appends and typed facts.
+        for table, columns, primary_key in (
+            ("facts", _COLUMNS, {"fact_id"}),
+            ("fact_sources", ("fact_id", "source_sha256", "source_url"),
+             {"fact_id", "source_sha256", "source_url"}),
+        ):
+            actual = {row[1]: (row[2], row[3], row[5]) for row in
+                      self.connection.execute(f"PRAGMA table_info('{table}')").fetchall()}
+            expected = {name: ("DOUBLE" if name == "value" else "VARCHAR", True,
+                               name in primary_key) for name in columns}
+            if actual != expected:
+                raise ValueError(f"Incompatible {table} schema: expected typed, non-null columns and primary key")
 
     def __enter__(self) -> "DuckDBStore":
         return self
@@ -157,7 +169,8 @@ class DuckDBStore:
                 f"INSERT INTO facts ({_SELECT}) SELECT {_SELECT} FROM (SELECT {_UNNEST_FACTS}) "
                 "ON CONFLICT DO NOTHING", columns)
             self.connection.execute(
-                "INSERT INTO fact_sources SELECT * FROM (SELECT UNNEST(?::VARCHAR[]) AS fact_id, "
+                "INSERT INTO fact_sources (fact_id, source_sha256, source_url) "
+                "SELECT * FROM (SELECT UNNEST(?::VARCHAR[]) AS fact_id, "
                 "UNNEST(?::VARCHAR[]) AS source_sha256, UNNEST(?::VARCHAR[]) AS source_url) "
                 "ON CONFLICT DO NOTHING",
                 [list(column) for column in zip(*links)],

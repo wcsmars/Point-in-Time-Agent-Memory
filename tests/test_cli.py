@@ -347,3 +347,32 @@ def test_study_output_cannot_overwrite_its_input_inside_the_leakage_folder(tmp_p
     write_facts_jsonl(build_demo(3).facts, facts)
     assert main(["study", "--facts", str(facts), "--output", str(out), "--bootstrap-samples", "0"]) == 2
     assert "would overwrite" in capsys.readouterr().err
+
+
+def test_agent_cli_passes_host_controls_and_reports_result(tmp_path, monkeypatch, capsys):
+    from pit_memory import claude_agent
+    seen = {}
+
+    async def fake_run(database, prompt, **options):
+        seen.update(database=database, prompt=prompt, **options)
+        return {"status": "completed", "answer": "cited answer", "tool_calls": []}
+
+    monkeypatch.setattr(claude_agent, "run_agent", fake_run)
+    db = tmp_path / "facts.duckdb"
+    assert main(["agent", "--db", str(db), "--as-of", "2021-03-15", "--prompt", "IBM revenue?",
+                 "--max-turns", "3", "--max-budget-usd", "0.25", "--model", "test-model"]) == 0
+    assert seen == {"database": db, "prompt": "IBM revenue?", "as_of": "2021-03-15",
+                    "max_turns": 3, "max_budget_usd": 0.25, "model": "test-model"}
+    assert json.loads(capsys.readouterr().out)["status"] == "completed"
+
+
+def test_agent_cli_returns_failure_for_unverified_result(tmp_path, monkeypatch, capsys):
+    from pit_memory import claude_agent
+
+    async def fake_run(*args, **options):
+        return {"status": "error", "error": "No successful point-in-time lookup"}
+
+    monkeypatch.setattr(claude_agent, "run_agent", fake_run)
+    assert main(["agent", "--db", str(tmp_path / "facts.duckdb"), "--as-of", "2021-03-15",
+                 "--prompt", "IBM revenue?"]) == 2
+    assert json.loads(capsys.readouterr().out)["status"] == "error"

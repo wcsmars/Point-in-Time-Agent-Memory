@@ -299,3 +299,9 @@ def test_overwrite_snapshot_replaces_a_year_whose_start_date_convention_changed(
     result = index.retrieve(query("2023-01-03"), "overwrite")
     assert result.fact == later and old not in result.context
     assert old in index.retrieve(query("2023-01-03"), "period_end").context
+
+
+@pytest.mark.parametrize("samples", [-1, 1.5, True])
+def test_bootstrap_samples_must_be_a_nonnegative_integer_even_with_no_queries(samples):
+    with pytest.raises(ValueError, match="nonnegative integer"):
+        evaluate([], [], bootstrap_samples=samples)

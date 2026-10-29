@@ -203,10 +203,10 @@ def evaluate_factor(
     Date-bootstrap intervals are descriptive and assume dates are independent;
     overlapping return horizons require a block-bootstrap extension.
     """
-    if min_entities < 3:
-        raise ValueError("min_entities must be at least 3")
-    if bootstrap_samples < 0:
-        raise ValueError("bootstrap_samples must be nonnegative")
+    if type(min_entities) is not int or min_entities < 3:
+        raise ValueError("min_entities must be an integer of at least 3")
+    if type(bootstrap_samples) is not int or bootstrap_samples < 0:
+        raise ValueError("bootstrap_samples must be a nonnegative integer")
     observations = _validated_rows(rows)
     facts_list = list(facts)
     index = BackendIndex(facts_list)

@@ -44,3 +44,23 @@ Only validated annual duration facts from supported annual forms (10-K, 20-F and
 Each query records its expected answer, backend-selected fact, retrieved context, citation identifiers, timing, and leakage flags. A correct numeric answer does not excuse future evidence: equal-valued future revisions still constitute exposure under the citation-based availability rule.
 
 The benchmark does not use an LLM judge. Synthetic expected values are created independently of DuckDB retrieval. Real-data cases use the same separate reference routine. It checks the implementation against the rule, not the rule against the filings, so individual cases (the largest revisions in `examples/results/revisions.csv`) were matched to known corporate events (separations and retrospective adoptions of accounting standards). Original filings were not re-read for this release.
+
+
+## Optional SDK runner
+
+`claude_agent.run_agent` uses the Claude Agent SDK to manage each model/tool
+conversation. `pit-memory agent` supplies a required database, prompt and fixed
+`as_of`. The in-process MCP server exposes only the existing validated fact
+lookup. Its input schema omits the cutoff; the handler rejects attempts to pass
+one and injects the host's date. The read-only store stays open for the session.
+
+Built-in tools, project/user settings and external MCP configuration are disabled.
+The runner uses a temporary working directory, a maximum turn count and an SDK
+spending limit. Final output retains the tool-call evidence independently of the
+model's prose. SDK errors, missing results and missing successful evidence fail
+closed. These restrictions do not remove pretrained knowledge from the model.
+
+Install `.[agent]` separately. The base package, CLI query and deterministic
+benchmarks require no hosted model or SDK. SDK version and compatible MCP major
+are constrained together because their in-process tool adapter depends on the
+MCP server API. CI tests that adapter without authentication or paid calls.

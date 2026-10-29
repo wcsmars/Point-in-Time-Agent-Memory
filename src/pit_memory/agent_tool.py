@@ -107,7 +107,10 @@ def call_tool(arguments: Mapping[str, Any], retrieve: Callable[[Query], Retrieva
         return {"status": "error", "error": str(exc)}
     result = retrieve(query)
     if (not isinstance(result, Retrieval) or result.query_id != query.query_id
+            or not isinstance(result.status, str)
             or result.status not in {"known", "not_known", "ambiguous"}
+            or not isinstance(result.context, (tuple, list))
+            or not isinstance(result.reason, str)
             or (result.status == "known") != (result.fact is not None)
             or (result.status == "not_known" and result.context)):
         return {"status": "error", "error": "retriever returned an inconsistent result"}
@@ -121,6 +124,14 @@ def call_tool(arguments: Mapping[str, Any], retrieve: Callable[[Query], Retrieva
     response: dict[str, Any] = {"status": result.status, "as_of": query.as_of,
                                 "requested_period_end": query.period_end}
     if result.status == "known" and result.fact is not None:
+        # An in-scope answer can still be wrong: a retriever might select an
+        # older filing or overlook a conflict in its own context. Fail closed
+        # rather than turn that inconsistent evidence into an agent citation.
+        newest = max(((fact.period_end, fact.filed) for fact in result.context), default=None)
+        candidates = [fact for fact in result.context if (fact.period_end, fact.filed) == newest]
+        if (result.fact.fact_id not in {fact.fact_id for fact in candidates}
+                or len({(fact.period_start, fact.value) for fact in candidates}) != 1):
+            return {"status": "error", "error": "retriever selected an answer inconsistent with its evidence"}
         response["fact"] = _citation(result.fact)
     elif result.status == "ambiguous":
         # The in-memory backend can include older eligible context. Only the

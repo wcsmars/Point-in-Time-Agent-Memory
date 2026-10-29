@@ -197,6 +197,48 @@ def test_incompatible_database_is_not_partially_modified_or_left_open(tmp_path):
 
 
 @needs_duckdb
+@pytest.mark.parametrize("read_only", [False, True])
+@pytest.mark.parametrize("damage", ["unkeyed_facts", "unkeyed_sources", "text_value"])
+def test_existing_column_names_are_not_enough_to_validate_a_database(tmp_path, read_only, damage):
+    import duckdb
+    path = tmp_path / "incompatible.duckdb"
+    with DuckDBStore(path) as store:
+        store.append([fact()])
+    with duckdb.connect(str(path)) as connection:
+        if damage == "text_value":
+            connection.execute("DROP INDEX facts_lookup")
+            connection.execute("ALTER TABLE facts ALTER COLUMN value TYPE VARCHAR")
+        else:
+            table = "facts" if damage == "unkeyed_facts" else "fact_sources"
+            connection.execute(f"CREATE TABLE replacement AS SELECT * FROM {table}")
+            connection.execute(f"DROP TABLE {table}")
+            connection.execute(f"ALTER TABLE replacement RENAME TO {table}")
+    with pytest.raises(RuntimeError, match="Incompatible .* schema") as error:
+        DuckDBStore(path, read_only=read_only)
+    # The failed constructor must close even with its traceback retained.
+    assert error.value is not None
+    with duckdb.connect(str(path), read_only=True) as connection:
+        assert connection.execute("SELECT count(*) FROM facts").fetchone()[0] == 1
+
+
+@needs_duckdb
+def test_source_links_are_inserted_by_name_even_if_column_order_differs(tmp_path):
+    import duckdb
+    path = tmp_path / "reordered.duckdb"
+    with DuckDBStore(path):
+        pass
+    with duckdb.connect(str(path)) as connection:
+        connection.execute("DROP TABLE fact_sources")
+        connection.execute("CREATE TABLE fact_sources (source_url VARCHAR NOT NULL, fact_id VARCHAR NOT NULL, "
+                           "source_sha256 VARCHAR NOT NULL, PRIMARY KEY (fact_id, source_sha256, source_url))")
+    original = fact(source_sha256="a" * 64, source_url="https://www.sec.gov/filing")
+    with DuckDBStore(path) as store:
+        assert store.append([original]) == 1
+        assert store.sources(original.fact_id) == [{"source_sha256": "a" * 64,
+                                                    "source_url": "https://www.sec.gov/filing"}]
+
+
+@needs_duckdb
 def test_failed_source_link_write_rolls_back_facts_and_keeps_store_usable():
     import duckdb
     with DuckDBStore() as store:
@@ -204,11 +246,11 @@ def test_failed_source_link_write_rolls_back_facts_and_keeps_store_usable():
         store.append([original])
         # Simulate a damaged provenance schema after opening. The facts INSERT
         # succeeds first, then the source INSERT fails and must roll it back.
-        store.connection.execute("ALTER TABLE fact_sources ADD COLUMN extra VARCHAR")
+        store.connection.execute("ALTER TABLE fact_sources RENAME COLUMN source_url TO broken_source_url")
         with pytest.raises(duckdb.Error):
             store.append([fact(value=110, accession="new")])
         assert store.all_facts() == [original]
-        store.connection.execute("ALTER TABLE fact_sources DROP COLUMN extra")
+        store.connection.execute("ALTER TABLE fact_sources RENAME COLUMN broken_source_url TO source_url")
         assert store.append([fact(value=110, accession="new")]) == 1
 
 

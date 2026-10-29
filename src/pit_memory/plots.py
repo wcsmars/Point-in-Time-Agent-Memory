@@ -158,9 +158,14 @@ def plot_study(study_dir: str | Path, output_dir: str | Path) -> list[str]:
 
     divergence = json.loads((study_dir / "signal_divergence.json").read_text())
     fig, ax = plt.subplots(figsize=(7.2, 3.4))
-    identical = all(
-        divergence["summary"]["overwrite"][k] == divergence["summary"]["period_end"][k]
-        for k in ("changed_vs_bitemporal", "mean_rank_correlation_with_bitemporal"))
+    # Equal counts and means do not imply equal paths: the dates of peaks,
+    # troughs and undefined observations must also agree before hiding a line.
+    curves = {
+        backend: sorted((row["as_of"], row["rank_correlation_with_bitemporal"])
+                        for row in divergence["per_date"] if row["backend"] == backend)
+        for backend in ("overwrite", "period_end")
+    }
+    identical = curves["overwrite"] == curves["period_end"]
     for backend in ("vector", "period_end") if identical else ("vector", "overwrite", "period_end"):
         label = "Overwrite and period end (identical here)" if identical and backend == "period_end" else LABELS[backend]
         rows = [r for r in divergence["per_date"] if r["backend"] == backend]

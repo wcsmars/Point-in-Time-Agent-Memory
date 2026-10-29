@@ -81,3 +81,36 @@ def test_charts_leave_gaps_for_undefined_correlations_and_keep_every_revision(tm
     assert captured["bars"] == len([r for r in rows if r["relative_change"] and float(r["relative_change"]) != 0])
     assert captured["gap"] is True
     assert min(captured["ticks"]) <= -0.75
+
+
+def test_equal_aggregate_correlations_do_not_hide_different_curves(tmp_path, monkeypatch):
+    pytest.importorskip("matplotlib")
+    from pit_memory import plots
+
+    source = Path(__file__).resolve().parents[1] / "examples" / "results"
+    for filename in ("study.json", "revisions.csv"):
+        shutil.copyfile(source / filename, tmp_path / filename)
+    divergence = json.loads((source / "signal_divergence.json").read_text())
+    overwrite = [row for row in divergence["per_date"] if row["backend"] == "overwrite"]
+    defined = [row for row in overwrite if row["rank_correlation_with_bitemporal"] is not None]
+    first = defined[0]
+    second = next(row for row in defined if row["rank_correlation_with_bitemporal"]
+                  != first["rank_correlation_with_bitemporal"])
+    # Swapping dates preserves the mean and changed-signal total. Both paths
+    # still need to be visible because the timing of signal divergence differs.
+    key = "rank_correlation_with_bitemporal"
+    first[key], second[key] = second[key], first[key]
+    (tmp_path / "signal_divergence.json").write_text(json.dumps(divergence))
+
+    labels = []
+
+    def capture(fig, path):
+        import matplotlib.pyplot as plt
+        if path.name == "sec_signal_rank_correlation.png":
+            labels.extend(fig.axes[0].get_legend_handles_labels()[1])
+        plt.close(fig)
+        return str(path)
+
+    monkeypatch.setattr(plots, "_save", capture)
+    plots.plot_study(tmp_path, tmp_path / "figures")
+    assert labels == [plots.LABELS[b] for b in ("vector", "overwrite", "period_end")]

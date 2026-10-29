@@ -222,3 +222,12 @@ def test_previous_year_is_the_latest_period_inside_the_window():
     result = revenue_growth([november, fact(1, 2019, 100), fact(1, 2020, 110)], row, "bitemporal")
     assert result["previous_period_end"] == "2019-12-31"
     assert result["signal"] == pytest.approx(0.1)
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"bootstrap_samples": -1}, {"bootstrap_samples": 1.5}, {"bootstrap_samples": True},
+    {"min_entities": 2}, {"min_entities": 3.5}, {"min_entities": True},
+])
+def test_factor_count_parameters_are_validated_even_with_no_observations(kwargs):
+    with pytest.raises(ValueError, match="integer"):
+        evaluate_factor([], [], **kwargs)

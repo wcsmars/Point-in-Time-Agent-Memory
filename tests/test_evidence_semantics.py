@@ -1,6 +1,8 @@
 """Independent checks of the audit's interpretation of evidence."""
 from dataclasses import replace
 
+import pytest
+
 from pit_memory.evaluation import EvaluationCase, evaluate
 from pit_memory.models import Fact, Query, Retrieval
 
@@ -53,3 +55,44 @@ def test_equal_number_for_wrong_fiscal_year_is_inaccurate():
     trace = next(row for row in report["traces"] if row["backend"] == "bitemporal")
     assert trace["correct"] is False
     assert trace["answer_leaked"] is False
+
+
+@pytest.mark.parametrize("evidence", ["single", "duplicate", "other_issuer", "unavailable"])
+def test_ambiguity_requires_two_available_conflicting_citations(evidence):
+    old = original()
+    conflict = replace(old, value=101, accession="conflict", fact_id="")
+    query = Query("ambiguous", old.cik, old.concept, old.unit, "2021-03-01")
+    case = EvaluationCase(query, None, expected_status="ambiguous",
+                          expected_period_end=old.period_end, expected_filed=old.filed)
+    context = {
+        "single": (old,),
+        "duplicate": (old, old),
+        "other_issuer": (old, replace(conflict, cik="456", fact_id="")),
+        "unavailable": (old, replace(conflict, available_on="2021-04-01", fact_id="")),
+    }[evidence]
+    report = evaluate([old, conflict], [case], bootstrap_samples=0,
+                      bitemporal_retriever=lambda q: Retrieval(
+                          q.query_id, "bitemporal", None, context, "ambiguous"))
+    assert report["backends"]["bitemporal"]["metrics"]["accuracy"]["value"] == 0
+
+
+def test_not_known_with_a_selected_answer_is_not_a_correct_abstention():
+    old = original()
+    query = Query("not-known", old.cik, old.concept, old.unit, old.filed)
+    case = EvaluationCase(query, None, expected_status="not_known")
+    report = evaluate([old], [case], bootstrap_samples=0,
+                      bitemporal_retriever=lambda q: Retrieval(
+                          q.query_id, "bitemporal", old, (old,), "not_known"))
+    metrics = report["backends"]["bitemporal"]["metrics"]
+    assert metrics["accuracy"]["value"] == 0
+    assert metrics["correct_abstention_rate"]["value"] == 0
+
+
+def test_answer_for_a_different_query_is_not_credited():
+    old = original()
+    query = Query("expected-query", old.cik, old.concept, old.unit, "2021-03-01")
+    case = EvaluationCase(query, old.value, expected_period_end=old.period_end)
+    report = evaluate([old], [case], bootstrap_samples=0,
+                      bitemporal_retriever=lambda q: Retrieval(
+                          "another-query", "bitemporal", old, (old,)))
+    assert report["backends"]["bitemporal"]["metrics"]["accuracy"]["value"] == 0

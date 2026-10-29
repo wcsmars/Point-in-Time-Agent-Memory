@@ -34,3 +34,14 @@ jobs:
           "$RUNNER_TEMP/pit-wheel/bin/pit-memory" query --db wheel-sample.duckdb --cik 51143 \
             --concept us-gaap:Revenues --as-of 2021-03-15 --period-end 2019-12-31 > wheel-query.json
           "$RUNNER_TEMP/pit-wheel/bin/python" -c "import json; r = json.load(open('wheel-query.json')); assert r['status'] == 'known' and r['fact']['value'] == 77147000000.0, r"
+
+  agent-sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.11'
+      - run: python -m pip install -e '.[dev,agent]'
+      - run: python -m pip check
+      - run: python -m pytest tests/test_claude_agent.py tests/test_cli.py

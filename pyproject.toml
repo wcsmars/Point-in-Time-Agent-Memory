@@ -29,6 +29,7 @@ dependencies = ["duckdb>=1.1,<2", "exchange-calendars>=4.5,<5"]
 [project.optional-dependencies]
 dev = ["pytest>=8,<9"]
 plots = ["matplotlib>=3.7,<4"]
+agent = ["claude-agent-sdk==0.1.81", "mcp>=1.19,<2"]
 
 [project.urls]
 Homepage = "https://github.com/wcsmars/Point-in-Time-Agent-Memory"

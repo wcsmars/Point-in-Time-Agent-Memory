@@ -145,3 +145,32 @@ def test_tool_definition_in_each_function_calling_layout():
         assert _json.loads(_json.dumps(layout)) == layout
     schema["input_schema"]["required"].append("unit")  # copies: the shared spec is unchanged
     assert TOOL_SPEC["parameters"]["required"] == ["cik", "concept", "as_of"]
+
+
+@pytest.mark.parametrize("case", ["older_filing", "older_period", "conflict", "missing_context"])
+def test_known_answer_must_agree_with_the_newest_context(case):
+    original, recast = facts()
+    if case == "older_filing":
+        selected, context = original, (original, recast)
+    elif case == "older_period":
+        current = replace(original, period_start="2020-01-01", period_end="2020-12-31",
+                          filed="2021-02-25", available_on="2021-02-26", fact_id="")
+        selected, context = recast, (recast, current)
+    elif case == "conflict":
+        clash = replace(recast, value=58.0, accession="conflict", fact_id="")
+        selected, context = recast, (recast, clash)
+    else:
+        selected, context = recast, ()
+    result = call_tool({"cik": "51143", "concept": "us-gaap:Revenues", "as_of": "2022-03-01"},
+                       lambda q: Retrieval(q.query_id, "broken", selected, context, "known"))
+    assert result["status"] == "error"
+    assert "fact" not in result
+
+
+@pytest.mark.parametrize("changes", [{"context": None}, {"status": []}, {"reason": object()}])
+def test_malformed_retrieval_fields_return_a_json_error(changes):
+    original = facts()[0]
+    result = call_tool({"cik": "51143", "concept": "us-gaap:Revenues", "as_of": "2021-03-15"},
+                       lambda q: replace(Retrieval(q.query_id, "broken", original, (original,)), **changes))
+    assert result["status"] == "error"
+    json.dumps(result, allow_nan=False)

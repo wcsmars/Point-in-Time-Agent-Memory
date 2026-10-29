@@ -214,3 +214,10 @@ return data, record the exact query distribution, and distinguish synthetic
 checks from observed results. Report availability-based leakage, literal
 future-filing leakage, context exposure, correct abstentions, coverage, paired IC,
 and uncertainty together.
+
+
+For an ambiguous answer to score as correct, the response must identify the
+requested query and cite at least two eligible, conflicting values from the
+expected winning period and filing date. A claimed abstention with a selected
+answer is contradictory and does not score as correct. These checks also apply
+to externally supplied retrieval implementations.

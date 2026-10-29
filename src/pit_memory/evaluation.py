@@ -236,8 +236,8 @@ def evaluate(facts: Iterable[Fact], cases: Iterable[EvaluationCase] | None = Non
     to it one at a time and not kept (``report["traces"]`` is then None), so a
     large audit needs memory only for per-issuer counts.
     """
-    if bootstrap_samples < 0:
-        raise ValueError("bootstrap_samples must be non-negative")
+    if type(bootstrap_samples) is not int or bootstrap_samples < 0:
+        raise ValueError("bootstrap_samples must be a nonnegative integer")
     facts = tuple(facts)
     cases = list(cases) if cases is not None else generate_cases(facts)
     if len({case.query.query_id for case in cases}) != len(cases):
@@ -256,7 +256,12 @@ def evaluate(facts: Iterable[Fact], cases: Iterable[EvaluationCase] | None = Non
                       else index.retrieve(case.query, backend))
             latency = (time.perf_counter() - started) * 1000
             fact = result.fact
-            correct = result.status == case.expected_status
+            correct = (result.status == case.expected_status
+                       and result.query_id == case.query.query_id)
+            if case.expected_status != "known":
+                # A status label cannot turn a contradictory selected answer
+                # into an abstention, including for injected retrievers.
+                correct = correct and fact is None
             if case.expected_status == "known":
                 correct = bool(correct and fact is not None
                                and (fact.cik, fact.concept, fact.unit)
@@ -269,10 +274,17 @@ def evaluate(facts: Iterable[Fact], cases: Iterable[EvaluationCase] | None = Non
             elif case.expected_status == "ambiguous" and correct:
                 # An abstention is right only for the same conflicting filing:
                 # ambiguity about a year that was not yet filed is not credit.
-                newest = max(((item.period_end, item.filed) for item in result.context
-                              if (item.cik, item.concept, item.unit)
-                              == (case.query.cik, case.query.concept, case.query.unit)), default=None)
-                correct = newest == (case.expected_period_end, case.expected_filed)
+                scoped = [item for item in result.context
+                          if (item.cik, item.concept, item.unit)
+                          == (case.query.cik, case.query.concept, case.query.unit)
+                          and (case.query.period_end is None
+                               or item.period_end == case.query.period_end)]
+                newest = max(((item.period_end, item.filed) for item in scoped), default=None)
+                conflicts = {(item.value, item.period_start) for item in scoped
+                             if (item.period_end, item.filed) == newest
+                             and item.available_on <= case.query.as_of}
+                correct = (newest == (case.expected_period_end, case.expected_filed)
+                           and len(conflicts) > 1)
             row = {
                 "backend": backend,
                 "query": asdict(case.query),
@@ -291,7 +303,7 @@ def evaluate(facts: Iterable[Fact], cases: Iterable[EvaluationCase] | None = Non
                 "answer_leaked": bool(fact and fact.available_on > case.query.as_of),
                 "future_filing_answer": bool(fact and fact.filed > case.query.as_of),
                 "context_leaked": any(item.available_on > case.query.as_of for item in result.context),
-                "correct_abstention": case.expected_status == "not_known" and result.status == "not_known",
+                "correct_abstention": case.expected_status == "not_known" and correct,
                 "latency_ms": latency,
             }
             tally.add(row)

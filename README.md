@@ -284,6 +284,42 @@ ambiguous. Malformed arguments return `{"status": "error", ...}` so the model
 can correct its call. The handler also rejects evidence outside the requested
 issuer, concept, unit, period or cutoff, even if an incompatible retriever is supplied.
 
+### Run a question with the Claude Agent SDK
+
+The optional runner delegates the model/tool cycle to the
+[Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk-python).
+There is no application-written model retry or tool dispatch loop.
+The Python SDK is MIT licensed; its bundled Claude Code runtime and hosted
+service have separate terms. Model calls require authentication and may incur charges.
+
+```bash
+python -m pip install -e '.[agent]'
+# Set ANTHROPIC_API_KEY in your shell, or authenticate the SDK runtime.
+pit-memory agent --db data/sample.duckdb --as-of 2021-03-15 \
+  --prompt "What was IBM's 2019 us-gaap:Revenues in USD? Use CIK 51143." \
+  --max-turns 6 --max-budget-usd 0.50
+```
+
+The host fixes `as_of` for the entire run. The model cannot move it forward.
+Only the read-only fact lookup is exposed: built-in tools are disabled, local
+settings are not loaded, and the database is opened read-only. A temporary
+working directory separates the session from project files. The response includes
+the answer, authoritative tool-call evidence, usage and cost when reported by the
+SDK. A run without successful tool evidence or with a provider error is not
+reported as completed. The SDK budget is a provider guard, not an exact billing guarantee.
+
+The prompt and retrieved fact evidence are sent to the configured provider.
+The runner does not automatically read environment files. Keep credentials in
+the shell or the runtime's authentication store, outside source control.
+The optional dependency pins the verified SDK release and restricts MCP to its
+compatible major version. Offline transport tests check the real SDK/MCP
+contract without a model request.
+
+A cutoff constrains tool retrieval, not the model's pretrained knowledge.
+Check final claims against `tool_calls`; generated prose is not independently
+verified. The existing deterministic study does not measure model hallucination
+or training-data leakage.
+
 ## Repository layout
 
 ```
@@ -297,10 +333,11 @@ src/pit_memory/
   factor.py       revenue-growth signal, tie-aware Spearman IC, paired IC differences
   study.py        revision profile, scheduled audit, signal divergence
   agent_tool.py   JSON Schema tool definition and handler for an LLM agent
+  claude_agent.py optional SDK runner with a fixed knowledge cutoff
   plots.py        figures in this README
   demo.py         labelled synthetic fixture
   cli.py          pit-memory command line
-tests/            295 tests: dates, holidays, restatements, SQL, CLI, cross-checks
+tests/            dates, holidays, restatements, SQL, CLI, SDK, cross-checks
 docs/             architecture and full evaluation specification
 examples/         universe, SEC sample data, study outputs
 figures/          charts above
@@ -312,7 +349,7 @@ Methodology details, metric definitions and the factor protocol are in
 
 ## Validation
 
-- 295 tests include real exchange-calendar sessions (Good Friday, Hurricane
+- The test suite covers real exchange-calendar sessions (Good Friday, Hurricane
   Sandy and national days of mourning, year boundaries), DuckDB transactions
   and idempotent re-imports, ambiguity on same-day conflicts, rank ties,
   matched-cohort IC pairing, issuer-cluster bootstrap intervals, SEC retries,

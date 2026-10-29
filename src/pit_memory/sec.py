@@ -134,7 +134,7 @@ def parse_companyfacts(
                         if isinstance(val, bool) or not isinstance(val, (int, float)) or not math.isfinite(val):
                             raise ValueError("Fact value must be finite numeric data")
                         accession = entry.get("accn", "")
-                        if not isinstance(accession, str) or not re.fullmatch(r"\d{10}-\d{2}-\d{6}", accession):
+                        if not isinstance(accession, str) or not re.fullmatch(r"[0-9]{10}-[0-9]{2}-[0-9]{6}", accession):
                             raise ValueError("Missing or malformed accession number")
                         if end > filed:
                             raise ValueError("Fiscal period ends after filing date")

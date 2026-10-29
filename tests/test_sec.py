@@ -392,6 +392,14 @@ def test_malformed_accession_is_rejected_and_source_url_is_canonical():
         "https://www.sec.gov/Archives/edgar/data/123/000000012320000001/0000000123-20-000001-index.html")
 
 
+@pytest.mark.parametrize("accession", ["".join(chr(0xFF10 + int(c)) if c.isdigit() else c for c in "0000000123-20-000001"), "0000000123-20-00000" + chr(0x661)])
+def test_accession_digits_must_be_ascii_for_a_valid_sec_citation(accession):
+    result = parse_companyfacts(payload([row(accn=accession)]), calendar=fake_calendar)
+    assert result.facts == []
+    assert len(result.rejected) == 1
+    assert "accession" in result.rejected[0]["reason"]
+
+
 # ---- proposed: retry policy and rate limit
 def test_server_errors_and_url_errors_are_retried_honoring_capped_retry_after(tmp_path, monkeypatch):
     from urllib.error import URLError

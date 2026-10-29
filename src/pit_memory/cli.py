@@ -162,6 +162,14 @@ def parser() -> argparse.ArgumentParser:
     query.add_argument("--backend", choices=("bitemporal", "vector", "overwrite", "period_end"),
                        default="bitemporal", help="retrieval design to use")
 
+    agent = command("agent", "Ask a dated financial question through the Claude Agent SDK (needs .[agent])")
+    agent.add_argument("--db", type=Path, required=True, help="read-only DuckDB fact database")
+    agent.add_argument("--as-of", required=True, help="host-enforced knowledge date YYYY-MM-DD")
+    agent.add_argument("--prompt", required=True, help="financial question to answer using the fact tool")
+    agent.add_argument("--model", help="provider model ID (default: SDK default)")
+    agent.add_argument("--max-turns", type=int, default=6, help="SDK turn limit")
+    agent.add_argument("--max-budget-usd", type=float, default=0.50, help="SDK spending limit in USD")
+
     audit = command("evaluate", "Audit all backends on boundary questions around every filing date")
     audit.add_argument("--db", type=Path, required=True, help="DuckDB fact database")
     audit.add_argument("--output", type=Path, default=Path("runs/audit"), help="output folder")
@@ -251,6 +259,15 @@ def main(argv: list[str] | None = None) -> int:
             }
             _print(result)
             return 0
+
+        if args.command == "agent":
+            import asyncio
+            from .claude_agent import run_agent
+            result = asyncio.run(run_agent(
+                args.db, args.prompt, as_of=args.as_of, model=args.model,
+                max_turns=args.max_turns, max_budget_usd=args.max_budget_usd))
+            _print(result)
+            return 0 if result["status"] == "completed" else 2
 
         if args.command == "study":
             _print(_run_study(args))
@@ -379,7 +396,9 @@ def main(argv: list[str] | None = None) -> int:
             _print({"factor_report": str(args.output.resolve())})
         return 0
     except ImportError as exc:
-        if "matplotlib" in str(exc):
+        if "claude_agent_sdk" in str(exc):
+            hint = "the agent extra: python -m pip install 'pit-agent-memory[agent]' (or -e '.[agent]' in a checkout)"
+        elif "matplotlib" in str(exc):
             hint = "the plotting extra: python -m pip install 'pit-agent-memory[plots]' (or -e '.[plots]' in a checkout)"
         else:
             hint = "the package's dependencies: python -m pip install -e . in a checkout, or reinstall pit-agent-memory"
